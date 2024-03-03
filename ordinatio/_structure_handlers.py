@@ -1,4 +1,5 @@
 from dataclasses import MISSING, fields, is_dataclass
+from functools import wraps
 from typing import Any, get_args, get_origin
 
 from ._structure import PredicateStructureHandler, Structurer, StructuringError
@@ -6,6 +7,7 @@ from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 def simple_structure(func):
+    @wraps(func)
     def _wrapped(structurer, structure_into, val):
         return func(val)
 
@@ -15,7 +17,7 @@ def simple_structure(func):
 @simple_structure
 def structure_into_none(val: Any) -> None:
     if val is not None:
-        raise StructuringError("The value is not `None`")
+        raise StructuringError("The value must be `None`")
 
 
 @simple_structure
@@ -57,25 +59,23 @@ def structure_into_str(val: Any) -> str:
 
 
 def structure_into_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    exceptions = []
-    args = get_args(structure_into)
-    for arg in args:
-        try:
-            result = structurer.structure(arg, val)
-            break
-        except StructuringError as exc:
-            exceptions.append((UnionVariant(arg), exc))
-    else:
-        raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
+    variants = get_args(structure_into)
 
-    return result
+    exceptions = []
+    for variant in variants:
+        try:
+            return structurer.structure_into(variant, val)
+        except StructuringError as exc:
+            exceptions.append((UnionVariant(variant), exc))
+
+    raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
 
 
 def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    elem_types = get_args(structure_into)
-
     if not isinstance(val, (list, tuple)):
         raise StructuringError("Can only structure a tuple or a list into a tuple generic")
+
+    elem_types = get_args(structure_into)
 
     # Tuple[()] is supposed to represent an empty tuple. Mypy knows this,
     # but in Python < 3.11 `get_args(Tuple[()])` returns `((),)` instead of `()` as it should.
@@ -100,7 +100,7 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
     exceptions = []
     for index, (item, tp) in enumerate(zip(val, elem_types)):
         try:
-            result.append(structurer.structure(tp, item))
+            result.append(structurer.structure_into(tp, item))
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
@@ -111,15 +111,16 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
 
 
 def structure_into_list(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    (item_type,) = get_args(structure_into)
     if not isinstance(val, (list, tuple)):
         raise StructuringError("Can only structure a tuple or a list into a list generic")
+
+    (item_type,) = get_args(structure_into)
 
     result = []
     exceptions = []
     for index, item in enumerate(val):
         try:
-            result.append(structurer.structure(item_type, item))
+            result.append(structurer.structure_into(item_type, item))
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
@@ -130,21 +131,22 @@ def structure_into_list(structurer: Structurer, structure_into: type, val: Any) 
 
 
 def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    key_type, value_type = get_args(structure_into)
     if not isinstance(val, dict):
         raise StructuringError("Can only structure a dict into a dict generic")
+
+    key_type, value_type = get_args(structure_into)
 
     result = {}
     exceptions = []
     for index, (key, value) in enumerate(val.items()):
         # Note that we're not using `key` for the path, since it can be anything.
         try:
-            structured_key = structurer.structure(key_type, key)
+            structured_key = structurer.structure_into(key_type, key)
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((DictKey(key), exc))
 
         try:
-            structured_value = structurer.structure(value_type, value)
+            structured_value = structurer.structure_into(value_type, value)
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((DictValue(key), exc))
 
@@ -172,7 +174,7 @@ class StructureListIntoDataclass(PredicateStructureHandler):
         for i, field in enumerate(struct_fields):
             if i < len(obj):
                 try:
-                    results[field.name] = structurer.structure(field.type, obj[i])
+                    results[field.name] = structurer.structure_into(field.type, obj[i])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:
@@ -202,7 +204,7 @@ class StructureDictIntoDataclass(PredicateStructureHandler):
             obj_name = self._name_converter(field.name, field.metadata)
             if obj_name in obj:
                 try:
-                    results[field.name] = structurer.structure(field.type, obj[obj_name])
+                    results[field.name] = structurer.structure_into(field.type, obj[obj_name])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:

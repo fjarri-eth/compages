@@ -60,7 +60,7 @@ class Structurer:
         self._handlers = handlers
         self._predicate_handlers = predicate_handlers
 
-    def structure(self, structure_into: Type[_T], obj: Any) -> _T:
+    def structure_into(self, structure_into: Type[_T], obj: Any) -> _T:
         # First check if there is an exact match registered
         handler = self._handlers.get(structure_into, None)
 

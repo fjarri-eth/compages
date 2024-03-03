@@ -1,13 +1,16 @@
+import re
 from dataclasses import dataclass
 from typing import List, NewType
 
 import pytest
 
 from ordinatio import (
-    UnstructureDataclassAsDict,
+    UnstructureAsDataclass,
     Unstructurer,
     UnstructuringError,
-    unstructure_list,
+    simple_unstructure,
+    unstructure_as_int,
+    unstructure_as_list,
 )
 
 HexInt = NewType("HexInt", int)
@@ -16,12 +19,20 @@ HexInt = NewType("HexInt", int)
 OtherInt = NewType("OtherInt", int)
 
 
-def unstructure_int(unstructurer, unstructure_as, obj):
-    return obj
+def assert_exception_matches(exc, reference_exc):
+    assert isinstance(exc, UnstructuringError)
+    assert re.match(reference_exc.message, exc.message)
+    assert len(exc.inner_errors) == len(reference_exc.inner_errors)
+    for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
+        exc.inner_errors, reference_exc.inner_errors
+    ):
+        assert inner_path == ref_path
+        assert_exception_matches(inner_exc, ref_exc)
 
 
-def unstructure_hex_int(unstructurer, unstructure_as, obj):
-    return hex(obj)
+@simple_unstructure
+def unstructure_as_hex_int(val):
+    return hex(val)
 
 
 def test_unstructure_routing():
@@ -40,22 +51,32 @@ def test_unstructure_routing():
         # will have a specific `List[int]` handler, which takes priority over the generic `list` one
         custom_generic: List[int]
 
-    def unstructure_custom_generic(unstructurer, unstructure_as, obj):
-        return obj
+    def unstructure_as_custom_generic(unstructurer, unstructure_as, val):
+        return val
 
     unstructurer = Unstructurer(
         handlers={
-            int: unstructure_int,
-            HexInt: unstructure_hex_int,
-            List[int]: unstructure_custom_generic,
-            list: unstructure_list,
+            int: unstructure_as_int,
+            HexInt: unstructure_as_hex_int,
+            List[int]: unstructure_as_custom_generic,
+            list: unstructure_as_list,
         },
-        predicate_handlers=[UnstructureDataclassAsDict()],
+        predicate_handlers=[UnstructureAsDataclass()],
     )
 
-    result = unstructurer.unstructure(
+    result = unstructurer.unstructure_as(
+        Container,
         Container(regular_int=1, hex_int=2, other_int=3, generic=[4, 5], custom_generic=[6, 7]),
     )
     assert result == dict(
         regular_int=1, hex_int="0x2", other_int=3, generic=["0x4", "0x5"], custom_generic=[6, 7]
     )
+
+
+def test_unstructure_routing_handler_not_found():
+    unstructurer = Unstructurer()
+
+    with pytest.raises(UnstructuringError) as exc:
+        unstructurer.unstructure_as(int, 1)
+    expected = UnstructuringError("No handlers registered to unstructure as <class 'int'>")
+    assert_exception_matches(exc.value, expected)

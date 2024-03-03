@@ -75,7 +75,7 @@ def test_structure_routing():
         predicate_handlers=[StructureDictIntoDataclass()],
     )
 
-    result = structurer.structure(
+    result = structurer.structure_into(
         Container,
         dict(
             regular_int=1, hex_int="0x2", other_int=3, generic=["0x4", "0x5"], custom_generic=[6, 7]
@@ -90,7 +90,7 @@ def test_structure_routing_handler_not_found():
     structurer = Structurer()
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure(int, 1)
+        structurer.structure_into(int, 1)
     expected = StructuringError("No handlers registered to structure into <class 'int'>")
     assert_exception_matches(exc.value, expected)
 
@@ -105,7 +105,7 @@ def test_structure_routing_error_wrapping():
         x: int
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure(Container, {"x": "a"})
+        structurer.structure_into(Container, {"x": "a"})
     expected = StructuringError(
         "Cannot structure a dict into a dataclass",
         [(StructField("x"), StructuringError("The value must be an integer"))],
@@ -138,7 +138,7 @@ def test_error_rendering():
 
     data = {"x": "a", "y": {"u": 1.2, "d": {"a": "b", 1: 2}, "l": [1, "a"]}}
     with pytest.raises(StructuringError) as exc:
-        structurer.structure(Outer, data)
+        structurer.structure_into(Outer, data)
     expected = StructuringError(
         "Cannot structure a dict into a dataclass",
         [

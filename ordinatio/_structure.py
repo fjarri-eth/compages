@@ -20,39 +20,31 @@ from typing import (
     get_origin,
 )
 
-Path = List[Union[str, int]]
-
-
-# TODO: a better name? Should emphasize that it's only to raise in handlers,
-# not to catch externally.
-class HandlingError(Exception):
-    pass
+from .path import PathElem
 
 
 class StructuringError(Exception):
-    def __init__(self, path: Path, message: str, inner_errors=[]):
+    def __init__(self, message: str, inner_errors=[]):
         super().__init__(message)
         self.message = message
-        self.path = path
         self.inner_errors = inner_errors
 
-    def path_str(self) -> str:
-        return ".".join(str(item) for item in self.path) if self.path else "<root>"
-
     def __str__(self):
-        messages = collect_messages(0, self)
+        messages = collect_messages([], self)
 
-        message_strings = [
-            (" " * (level * 2) + f"{path}: {msg}") if level > 0 else msg
-            for level, path, msg in messages]
+        _, msg = messages[0]
+        message_strings = [msg] + [
+            "  " * len(path) + ".".join(str(elem) for elem in path) + f": {msg}"
+            for path, msg in messages[1:]
+        ]
 
         return "\n".join(message_strings)
 
-def collect_messages(level: int, exc: StructuringError) -> List[Tuple[int, str, str]]:
-    message = exc.args[0]
-    result = [(level, exc.path_str(), exc.message)]
-    for exc in exc.inner_errors:
-        result.extend(collect_messages(level + 1, exc))
+
+def collect_messages(path, exc: StructuringError) -> List[Tuple[int, str, str]]:
+    result = [(path, exc.message)]
+    for path_elem, exc in exc.inner_errors:
+        result.extend(collect_messages([*path, path_elem], exc))
     return result
 
 
@@ -62,13 +54,13 @@ _T = TypeVar("_T")
 class Structurer:
     def __init__(
         self,
-        handlers: Mapping[Any, Callable[["Structurer", type, Path, Any], Any]] = {},
+        handlers: Mapping[Any, Callable[["Structurer", type, Any], Any]] = {},
         predicate_handlers: Iterable["PredicateHandler"] = [],
     ):
         self._handlers = handlers
         self._predicate_handlers = predicate_handlers
 
-    def structure_at_path(self, structure_into: Type[_T], path: Path, obj: Any) -> _T:
+    def structure(self, structure_into: Type[_T], obj: Any) -> _T:
         # First check if there is an exact match registered
         handler = self._handlers.get(structure_into, None)
 
@@ -92,21 +84,13 @@ class Structurer:
                     break
 
         if handler is None:
-            raise StructuringError(
-                path, f"No handlers registered to structure into {structure_into}"
-            )
+            raise StructuringError(f"No handlers registered to structure into {structure_into}")
 
-        try:
-            result = handler(self, structure_into, path, obj)
-        except HandlingError as exc:
-            raise StructuringError(path, str(exc)) from exc
+        result = handler(self, structure_into, obj)
 
         # Python typing is not advanced enough to enforce it,
         # so we are relying on the handler returning the type it was assigned to.
-        return cast(_T, handler(self, structure_into, path, obj))
-
-    def structure(self, structure_into: Type[_T], obj: Any) -> _T:
-        return self.structure_at_path(structure_into, [], obj)
+        return cast(_T, result)
 
 
 class PredicateHandler(ABC):
@@ -114,4 +98,4 @@ class PredicateHandler(ABC):
     def applies(self, structure_into, obj): ...
 
     @abstractmethod
-    def __call__(self, structurer, structure_into, path, obj): ...
+    def __call__(self, structurer, structure_into, obj): ...

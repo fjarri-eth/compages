@@ -1,5 +1,4 @@
 from ._structure import (
-    HandlingError,
     PredicateHandler,
     Structurer,
     StructuringError,

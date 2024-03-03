@@ -21,21 +21,19 @@ from ordinatio import (
     structure_tuple,
     structure_union,
 )
+from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 # TODO: duplicate
 def assert_exception_matches(exc, reference_exc):
-    if isinstance(reference_exc, StructuringError):
-        assert isinstance(exc, StructuringError)
-        assert exc.path == reference_exc.path
-        assert re.match(reference_exc.message, exc.message)
-        assert len(exc.inner_errors) == len(reference_exc.inner_errors)
-        for inner, reference_inner in zip(exc.inner_errors, reference_exc.inner_errors):
-            assert_exception_matches(inner, reference_inner)
-
-    else:
-        assert issubclass(type(exc), type(reference_exc))
-        assert re.match(str(reference_exc), str(exc))
+    assert isinstance(exc, StructuringError)
+    assert re.match(reference_exc.message, exc.message)
+    assert len(exc.inner_errors) == len(reference_exc.inner_errors)
+    for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
+        exc.inner_errors, reference_exc.inner_errors
+    ):
+        assert inner_path == ref_path
+        assert_exception_matches(inner_exc, ref_exc)
 
 
 def test_structure_none():
@@ -44,7 +42,7 @@ def test_structure_none():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(type(None), 1)
-    expected = StructuringError([], "The value is not `None`")
+    expected = StructuringError("The value is not `None`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -58,7 +56,7 @@ def test_structure_float():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(float, "a")
-    expected = StructuringError([], "The value must be a floating-point number")
+    expected = StructuringError("The value must be a floating-point number")
     assert_exception_matches(exc.value, expected)
 
 
@@ -69,7 +67,7 @@ def test_structure_bool():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(bool, "a")
-    expected = StructuringError([], "The value must be a boolean")
+    expected = StructuringError("The value must be a boolean")
     assert_exception_matches(exc.value, expected)
 
 
@@ -79,7 +77,7 @@ def test_structure_str():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(str, 1)
-    expected = StructuringError([], "The value must be a string")
+    expected = StructuringError("The value must be a string")
     assert_exception_matches(exc.value, expected)
 
 
@@ -89,7 +87,7 @@ def test_structure_bytes():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(bytes, 1)
-    expected = StructuringError([], "The value must be a bytestring")
+    expected = StructuringError("The value must be a bytestring")
     assert_exception_matches(exc.value, expected)
 
 
@@ -99,14 +97,14 @@ def test_structure_int():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(int, "a")
-    expected = StructuringError([], "The value must be an integer")
+    expected = StructuringError("The value must be an integer")
     assert_exception_matches(exc.value, expected)
 
     # Specifically test that a boolean is not accepted,
     # even though it is a subclass of int in Python.
     with pytest.raises(StructuringError) as exc:
         structurer.structure(int, True)
-    expected = StructuringError([], "The value must be an integer")
+    expected = StructuringError("The value must be an integer")
     assert_exception_matches(exc.value, expected)
 
 
@@ -120,11 +118,10 @@ def test_structure_union():
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Union[int, str], 1.2)
     expected = StructuringError(
-        [],
-        r"Could not structure into any of \(<class 'int'>, <class 'str'>\)",
+        r"Cannot structure into typing\.Union\[int, str\]",
         [
-            StructuringError([], "The value must be an integer"),
-            StructuringError([], "The value must be a string"),
+            (UnionVariant(int), StructuringError("The value must be an integer")),
+            (UnionVariant(str), StructuringError("The value must be a string")),
         ],
     )
     assert_exception_matches(exc.value, expected)
@@ -142,25 +139,24 @@ def test_structure_tuple():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Tuple[int, str], {"x": 1, "y": "a"})
-    expected = StructuringError([], "Can only structure a tuple or a list into a tuple generic")
+    expected = StructuringError("Can only structure a tuple or a list into a tuple generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Tuple[int, str, int], [1, "a"])
-    expected = StructuringError([], "Not enough elements to structure into a tuple: got 2, need 3")
+    expected = StructuringError("Not enough elements to structure into a tuple: got 2, need 3")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Tuple[int], [1, "a"])
-    expected = StructuringError([], "Too many elements to structure into a tuple: got 2, need 1")
+    expected = StructuringError("Too many elements to structure into a tuple: got 2, need 1")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Tuple[int, str], [1, 1.2])
     expected = StructuringError(
-        [],
-        r"Could not structure into typing\.Tuple\[int, str\]",
-        [StructuringError([1], "The value must be a string")],
+        r"Cannot structure into typing\.Tuple\[int, str\]",
+        [(ListElem(1), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -173,15 +169,14 @@ def test_structure_list():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(List[int], {"x": 1, "y": "a"})
-    expected = StructuringError([], "Can only structure a tuple or a list into a list generic")
+    expected = StructuringError("Can only structure a tuple or a list into a list generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(List[int], [1, "a"])
     expected = StructuringError(
-        [],
-        r"Could not structure into typing\.List\[int\]",
-        [StructuringError([1], "The value must be an integer")],
+        r"Cannot structure into typing\.List\[int\]",
+        [(ListElem(1), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -193,16 +188,15 @@ def test_structure_dict():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Dict[int, str], [(1, "a"), (2, "b")])
-    expected = StructuringError([], "Can only structure a dict into a dict generic")
+    expected = StructuringError("Can only structure a dict into a dict generic")
     assert_exception_matches(exc.value, expected)
 
     # Error structuring a key
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Dict[int, str], {"a": "b", 2: "c"})
     expected = StructuringError(
-        [],
-        r"Could not structure into typing\.Dict\[int, str\]",
-        [StructuringError([0, "<key>"], "The value must be an integer")],
+        r"Cannot structure into typing\.Dict\[int, str\]",
+        [(DictKey("a"), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -210,9 +204,8 @@ def test_structure_dict():
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Dict[int, str], {1: "a", 2: 3})
     expected = StructuringError(
-        [],
-        r"Could not structure into typing\.Dict\[int, str\]",
-        [StructuringError([1, "<val>"], "The value must be a string")],
+        r"Cannot structure into typing\.Dict\[int, str\]",
+        [(DictValue(2), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -234,22 +227,22 @@ def test_structure_dataclass_from_list():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, [1, "a", "b", 2])
-    expected = StructuringError([], "Too many fields to serialize into")
+    expected = StructuringError("Too many fields to serialize into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, [1])
     expected = StructuringError(
-        [], "Cannot structure a list into a dataclass", [StructuringError(["y"], "Missing field")]
+        "Cannot structure a list into a dataclass",
+        [(StructField("y"), StructuringError("Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, [1, 2, "a"])
     expected = StructuringError(
-        [],
         "Cannot structure a list into a dataclass",
-        [StructuringError(["y"], "The value must be a string")],
+        [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -278,18 +271,16 @@ def test_structure_dataclass_from_dict():
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, {"x_": 1, "z_": "b"})
     expected = StructuringError(
-        [],
         "Cannot structure a dict into a dataclass",
-        [StructuringError(["y"], r"Missing field \(`y_` in the input\)")],
+        [(StructField("y"), StructuringError(r"Missing field \(`y_` in the input\)"))],
     )
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, {"x_": 1, "y_": 2, "z_": "b"})
     expected = StructuringError(
-        [],
         "Cannot structure a dict into a dataclass",
-        [StructuringError(["y"], "The value must be a string")],
+        [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -301,6 +292,7 @@ def test_structure_dataclass_from_dict():
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, {"x": 1, "z": "b"})
     expected = StructuringError(
-        [], "Cannot structure a dict into a dataclass", [StructuringError(["y"], r"Missing field")]
+        "Cannot structure a dict into a dataclass",
+        [(StructField("y"), StructuringError(r"Missing field"))],
     )
     assert_exception_matches(exc.value, expected)

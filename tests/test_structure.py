@@ -5,7 +5,6 @@ from typing import Dict, List, NewType, Tuple, Union
 import pytest
 
 from ordinatio import (
-    HandlingError,
     StructureDataclassFromDict,
     StructureDataclassFromList,
     Structurer,
@@ -19,6 +18,7 @@ from ordinatio import (
     structure_tuple,
     structure_union,
 )
+from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 HexInt = NewType("HexInt", int)
 
@@ -34,17 +34,14 @@ def structure_hex_int(val):
 
 
 def assert_exception_matches(exc, reference_exc):
-    if isinstance(reference_exc, StructuringError):
-        assert isinstance(exc, StructuringError)
-        assert exc.path == reference_exc.path
-        assert re.match(reference_exc.message, exc.message)
-        assert len(exc.inner_errors) == len(reference_exc.inner_errors)
-        for inner, reference_inner in zip(exc.inner_errors, reference_exc.inner_errors):
-            assert_exception_matches(inner, reference_inner)
-
-    else:
-        assert issubclass(type(exc), type(reference_exc))
-        assert re.match(str(reference_exc), str(exc))
+    assert isinstance(exc, StructuringError)
+    assert re.match(reference_exc.message, exc.message)
+    assert len(exc.inner_errors) == len(reference_exc.inner_errors)
+    for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
+        exc.inner_errors, reference_exc.inner_errors
+    ):
+        assert inner_path == ref_path
+        assert_exception_matches(inner_exc, ref_exc)
 
 
 def test_structure_routing():
@@ -94,7 +91,7 @@ def test_structure_routing_handler_not_found():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure(int, 1)
-    expected = StructuringError([], "No handlers registered to structure into <class 'int'>")
+    expected = StructuringError("No handlers registered to structure into <class 'int'>")
     assert_exception_matches(exc.value, expected)
 
 
@@ -110,9 +107,8 @@ def test_structure_routing_error_wrapping():
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, {"x": "a"})
     expected = StructuringError(
-        [],
         "Cannot structure a dict into a dataclass",
-        [StructuringError(["x"], "The value must be an integer")],
+        [(StructField("x"), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -120,6 +116,7 @@ def test_structure_routing_error_wrapping():
 def test_error_rendering():
     @dataclass
     class Inner:
+        u: Union[int, str]
         d: Dict[int, str]
         l: List[int]
 
@@ -130,6 +127,7 @@ def test_error_rendering():
 
     structurer = Structurer(
         handlers={
+            Union: structure_union,
             list: structure_list,
             dict: structure_dict,
             int: structure_int,
@@ -138,50 +136,74 @@ def test_error_rendering():
         predicate_handlers=[StructureDataclassFromDict()],
     )
 
-    data = {"x": "a", "y": {"d": {"a": "b", 1: 2}, "l": [1, "a"]}}
+    data = {"x": "a", "y": {"u": 1.2, "d": {"a": "b", 1: 2}, "l": [1, "a"]}}
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Outer, data)
     expected = StructuringError(
-        [],
         "Cannot structure a dict into a dataclass",
         [
-            StructuringError(["x"], "The value must be an integer"),
-            StructuringError(
-                ["y"],
-                "Cannot structure a dict into a dataclass",
-                [
-                    StructuringError(
-                        ["y", "d"],
-                        r"Could not structure into typing\.Dict\[int, str\]",
-                        [
+            (StructField("x"), StructuringError("The value must be an integer")),
+            (
+                StructField("y"),
+                StructuringError(
+                    "Cannot structure a dict into a dataclass",
+                    [
+                        (
+                            StructField("u"),
                             StructuringError(
-                                ["y", "d", 0, "<key>"], "The value must be an integer"
+                                r"Cannot structure into typing\.Union\[int, str\]",
+                                [
+                                    (
+                                        UnionVariant(int),
+                                        StructuringError("The value must be an integer"),
+                                    ),
+                                    (
+                                        UnionVariant(str),
+                                        StructuringError("The value must be a string"),
+                                    ),
+                                ],
                             ),
-                            StructuringError(["y", "d", 1, "<val>"], "The value must be a string"),
-                        ],
-                    ),
-                    StructuringError(
-                        ["y", "l"],
-                        r"Could not structure into typing\.List\[int\]",
-                        [StructuringError(["y", "l", 1], "The value must be an integer")],
-                    ),
-                ],
+                        ),
+                        (
+                            StructField("d"),
+                            StructuringError(
+                                r"Cannot structure into typing\.Dict\[int, str\]",
+                                [
+                                    (
+                                        DictKey("a"),
+                                        StructuringError("The value must be an integer"),
+                                    ),
+                                    (DictValue(1), StructuringError("The value must be a string")),
+                                ],
+                            ),
+                        ),
+                        (
+                            StructField("l"),
+                            StructuringError(
+                                r"Cannot structure into typing\.List\[int\]",
+                                [(ListElem(1), StructuringError("The value must be an integer"))],
+                            ),
+                        ),
+                    ],
+                ),
             ),
         ],
     )
+
     assert_exception_matches(exc.value, expected)
 
     exc_str = """
 Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Outer'>
   x: The value must be an integer
   y: Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Inner'>
-    y.d: Could not structure into typing.Dict[int, str]
-      y.d.0.<key>: The value must be an integer
-      y.d.1.<val>: The value must be a string
-    y.l: Could not structure into typing.List[int]
-      y.l.1: The value must be an integer
+    y.u: Cannot structure into typing.Union[int, str]
+      y.u.<int>: The value must be an integer
+      y.u.<str>: The value must be a string
+    y.d: Cannot structure into typing.Dict[int, str]
+      y.d.key(a): The value must be an integer
+      y.d.[1]: The value must be a string
+    y.l: Cannot structure into typing.List[int]
+      y.l.[1]: The value must be an integer
 """.strip()
-
-    print(str(exc.value))
 
     assert str(exc.value) == exc_str

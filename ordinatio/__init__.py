@@ -1,5 +1,5 @@
 from ._structure import (
-    PredicateHandler,
+    PredicateStructureHandler,
     Structurer,
     StructuringError,
 )
@@ -18,4 +18,9 @@ from ._structure_handlers import (
     structure_into_tuple,
     structure_into_union,
 )
-from ._unstructure import Unstructurer
+from ._unstructure import (
+    PredicateUnstructureHandler,
+    Unstructurer,
+    UnstructuringError,
+)
+from ._unstructure_handlers import UnstructureDataclassAsDict, unstructure_list

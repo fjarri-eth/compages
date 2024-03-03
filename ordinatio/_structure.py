@@ -93,7 +93,7 @@ class Structurer:
         return cast(_T, result)
 
 
-class PredicateHandler(ABC):
+class PredicateStructureHandler(ABC):
     @abstractmethod
     def applies(self, structure_into, obj): ...
 

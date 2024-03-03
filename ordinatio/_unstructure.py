@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import fields, is_dataclass
 from typing import (
     Any,
@@ -5,6 +6,7 @@ from typing import (
     Dict,
     List,
     Mapping,
+    NewType,
     Optional,
     Union,
     get_args,
@@ -18,77 +20,50 @@ class UnstructuringError(Exception):
     pass
 
 
-def unstructure_list(unstructurer: "Unstructurer", unstructure_as: type, obj: List[Any]) -> IR:
-    # TODO: check that get_origin() is a List
-    args = get_args(unstructure_as)
-    if len(args) > 0:
-        return [unstructurer.unstructure_as(args[0], item) for item in obj]
-
-    # This can happen if we're just give a list of items to unstructure,
-    # as opposed to pulling a List[...] annotation out of a dataclass.
-    return [unstructurer.unstructure(item) for item in obj]
-
-
-def unstructure_union(unstructurer: "Unstructurer", unstructure_as: type, obj: Optional[Any]) -> IR:
-    args = get_args(unstructure_as)
-    for arg in args:
-        try:
-            return unstructurer.unstructure_as(arg, obj)
-        except UnstructuringError:  # noqa: PERF203
-            continue
-
-    raise UnstructuringError(f"Cannot unstructure as {unstructure_as}")
-
-
-def unstructure_none(_unstructurer: "Unstructurer", _unstructure_as: type, _obj: None) -> IR:
-    return None
-
-
 class Unstructurer:
-    @classmethod
-    def with_defaults(
-        cls,
-        hooks: Mapping[Any, Callable[["Unstructurer", type, Any], IR]],
-        field_name_hook: Optional[Callable[[str], str]] = None,
-    ) -> "Unstructurer":
-        all_hooks: Dict[Any, Callable[["Unstructurer", type, Any], IR]] = {
-            list: unstructure_list,
-            tuple: unstructure_list,
-            Union: unstructure_union,
-            type(None): unstructure_none,
-        }
-        all_hooks.update(hooks)
-        return cls(all_hooks, field_name_hook or (lambda x: x))
-
     def __init__(
         self,
-        hooks: Mapping[Any, Callable[["Unstructurer", type, Any], IR]],
-        field_name_hook: Callable[[str], str],
+        handlers: Mapping[Any, Callable[["Unstructurer", type, Any], IR]],
+        predicate_handlers,
     ):
-        self._hooks = hooks
-        self._field_name_hook = field_name_hook
+        self._handlers = handlers
+        self._predicate_handlers = predicate_handlers
 
     def unstructure_as(self, unstructure_as: type, obj: Any) -> IR:
-        origin = get_origin(unstructure_as)
-        if origin is not None:
-            tp = origin
-        else:
-            tp = unstructure_as
+        # First check if there is an exact match registered
+        handler = self._handlers.get(unstructure_as, None)
 
-        if tp in self._hooks:
-            try:
-                return self._hooks[tp](self, unstructure_as, obj)
-            except Exception as exc:  # noqa: BLE001
-                raise UnstructuringError(f"Cannot unstructure as {unstructure_as}") from exc
+        # If it's a newtype, try to fall back to a handler for the wrapped type
+        if handler is None and isinstance(unstructure_as, NewType):
+            handler = self._handlers.get(unstructure_as.__supertype__, None)
 
-        if is_dataclass(unstructure_as):
-            result = {}
-            for field in fields(unstructure_as):
-                result_name = self._field_name_hook(field.name)
-                result[result_name] = self.unstructure_as(field.type, getattr(obj, field.name))
-            return result
+        # If it's a generic, see if there is a handler for the generic origin
+        if handler is None:
+            origin = get_origin(unstructure_as)
+            if origin is not None:
+                handler = self._handlers.get(origin, None)
 
-        raise UnstructuringError(f"No hooks registered to unstructure {unstructure_as}")
+        # Check all predicate handlers in order and see if there is one that applies
+        # TODO: should `applies()` raise an exception which we could collect
+        # and attach to the error below, to provide more context on why no handlers were found?
+        if handler is None:
+            for predicate_handler in self._predicate_handlers:
+                if predicate_handler.applies(unstructure_as, obj):
+                    handler = predicate_handler
+                    break
+
+        if handler is None:
+            raise UnstructuringError(f"No handlers registered to unstructure as {unstructure_as}")
+
+        return handler(self, unstructure_as, obj)
 
     def unstructure(self, obj: Any) -> IR:
         return self.unstructure_as(type(obj), obj)
+
+
+class PredicateUnstructureHandler(ABC):
+    @abstractmethod
+    def applies(self, unstructure_as, obj): ...
+
+    @abstractmethod
+    def __call__(self, unstructurer, unstructure_as, obj): ...

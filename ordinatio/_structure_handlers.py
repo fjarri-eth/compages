@@ -1,7 +1,7 @@
 from dataclasses import MISSING, fields, is_dataclass
 from typing import Any, get_args, get_origin
 
-from ._structure import PredicateHandler, Structurer, StructuringError
+from ._structure import PredicateStructureHandler, Structurer, StructuringError
 from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
@@ -156,7 +156,7 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
     return result
 
 
-class StructureListIntoDataclass(PredicateHandler):
+class StructureListIntoDataclass(PredicateStructureHandler):
     def applies(self, structure_into, obj):
         return is_dataclass(structure_into) and isinstance(obj, list)
 
@@ -188,7 +188,7 @@ class StructureListIntoDataclass(PredicateHandler):
         return structure_into(**results)
 
 
-class StructureDictIntoDataclass(PredicateHandler):
+class StructureDictIntoDataclass(PredicateStructureHandler):
     def __init__(self, name_converter=lambda name, metadata: name):
         self._name_converter = name_converter
 

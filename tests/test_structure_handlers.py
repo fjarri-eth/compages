@@ -5,21 +5,21 @@ from typing import Dict, List, NewType, Tuple, Union
 import pytest
 
 from ordinatio import (
-    StructureDataclassFromDict,
-    StructureDataclassFromList,
+    StructureDictIntoDataclass,
+    StructureListIntoDataclass,
     Structurer,
     StructuringError,
     simple_structure,
-    structure_bool,
-    structure_bytes,
-    structure_dict,
-    structure_float,
-    structure_int,
-    structure_list,
-    structure_none,
-    structure_str,
-    structure_tuple,
-    structure_union,
+    structure_into_bool,
+    structure_into_bytes,
+    structure_into_dict,
+    structure_into_float,
+    structure_into_int,
+    structure_into_list,
+    structure_into_none,
+    structure_into_str,
+    structure_into_tuple,
+    structure_into_union,
 )
 from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -36,8 +36,8 @@ def assert_exception_matches(exc, reference_exc):
         assert_exception_matches(inner_exc, ref_exc)
 
 
-def test_structure_none():
-    structurer = Structurer(handlers={type(None): structure_none})
+def test_structure_into_none():
+    structurer = Structurer(handlers={type(None): structure_into_none})
     assert structurer.structure(type(None), None) is None
 
     with pytest.raises(StructuringError) as exc:
@@ -46,8 +46,8 @@ def test_structure_none():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_float():
-    structurer = Structurer(handlers={float: structure_float})
+def test_structure_into_float():
+    structurer = Structurer(handlers={float: structure_into_float})
     assert structurer.structure(float, 1.5) == 1.5
 
     # Specifically allow integers, but check that they are converted to floats.
@@ -60,8 +60,8 @@ def test_structure_float():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_bool():
-    structurer = Structurer(handlers={bool: structure_bool})
+def test_structure_into_bool():
+    structurer = Structurer(handlers={bool: structure_into_bool})
     assert structurer.structure(bool, True) is True
     assert structurer.structure(bool, False) is False
 
@@ -71,8 +71,8 @@ def test_structure_bool():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_str():
-    structurer = Structurer(handlers={str: structure_str})
+def test_structure_into_str():
+    structurer = Structurer(handlers={str: structure_into_str})
     assert structurer.structure(str, "abc") == "abc"
 
     with pytest.raises(StructuringError) as exc:
@@ -81,8 +81,8 @@ def test_structure_str():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_bytes():
-    structurer = Structurer(handlers={bytes: structure_bytes})
+def test_structure_into_bytes():
+    structurer = Structurer(handlers={bytes: structure_into_bytes})
     assert structurer.structure(bytes, b"abc") == b"abc"
 
     with pytest.raises(StructuringError) as exc:
@@ -91,8 +91,8 @@ def test_structure_bytes():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_int():
-    structurer = Structurer(handlers={int: structure_int})
+def test_structure_into_int():
+    structurer = Structurer(handlers={int: structure_into_int})
     assert structurer.structure(int, 1) == 1
 
     with pytest.raises(StructuringError) as exc:
@@ -108,9 +108,9 @@ def test_structure_int():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_union():
+def test_structure_into_union():
     structurer = Structurer(
-        handlers={Union: structure_union, int: structure_int, str: structure_str}
+        handlers={Union: structure_into_union, int: structure_into_int, str: structure_into_str}
     )
     assert structurer.structure(Union[int, str], "a") == "a"
     assert structurer.structure(Union[int, str], 1) == 1
@@ -127,9 +127,9 @@ def test_structure_union():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_tuple():
+def test_structure_into_tuple():
     structurer = Structurer(
-        handlers={tuple: structure_tuple, int: structure_int, str: structure_str}
+        handlers={tuple: structure_into_tuple, int: structure_into_int, str: structure_into_str}
     )
 
     assert structurer.structure(Tuple[()], []) == ()
@@ -161,8 +161,8 @@ def test_structure_tuple():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_list():
-    structurer = Structurer(handlers={list: structure_list, int: structure_int})
+def test_structure_into_list():
+    structurer = Structurer(handlers={list: structure_into_list, int: structure_into_int})
 
     assert structurer.structure(List[int], [1, 2, 3]) == [1, 2, 3]
     assert structurer.structure(List[int], (1, 2, 3)) == [1, 2, 3]
@@ -181,8 +181,10 @@ def test_structure_list():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_dict():
-    structurer = Structurer(handlers={dict: structure_dict, int: structure_int, str: structure_str})
+def test_structure_into_dict():
+    structurer = Structurer(
+        handlers={dict: structure_into_dict, int: structure_into_int, str: structure_into_str}
+    )
 
     assert structurer.structure(Dict[int, str], {1: "a", 2: "b"}) == {1: "a", 2: "b"}
 
@@ -212,8 +214,8 @@ def test_structure_dict():
 
 def test_structure_dataclass_from_list():
     structurer = Structurer(
-        handlers={int: structure_int, str: structure_str},
-        predicate_handlers=[StructureDataclassFromList()],
+        handlers={int: structure_into_int, str: structure_into_str},
+        predicate_handlers=[StructureListIntoDataclass()],
     )
 
     @dataclass
@@ -249,9 +251,9 @@ def test_structure_dataclass_from_list():
 
 def test_structure_dataclass_from_dict():
     structurer = Structurer(
-        handlers={int: structure_int, str: structure_str},
+        handlers={int: structure_into_int, str: structure_into_str},
         predicate_handlers=[
-            StructureDataclassFromDict(name_converter=lambda name, metadata: name + "_")
+            StructureDictIntoDataclass(name_converter=lambda name, metadata: name + "_")
         ],
     )
 
@@ -286,8 +288,8 @@ def test_structure_dataclass_from_dict():
 
     # Need a structurer without a name converter for this one
     structurer = Structurer(
-        handlers={int: structure_int, str: structure_str},
-        predicate_handlers=[StructureDataclassFromDict()],
+        handlers={int: structure_into_int, str: structure_into_str},
+        predicate_handlers=[StructureDictIntoDataclass()],
     )
     with pytest.raises(StructuringError) as exc:
         structurer.structure(Container, {"x": 1, "z": "b"})

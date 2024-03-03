@@ -13,13 +13,13 @@ def simple_structure(func):
 
 
 @simple_structure
-def structure_none(val: Any) -> None:
+def structure_into_none(val: Any) -> None:
     if val is not None:
         raise StructuringError("The value is not `None`")
 
 
 @simple_structure
-def structure_int(val: Any) -> int:
+def structure_into_int(val: Any) -> int:
     # Handling a special case of `bool` here since in Python `bool` is an `int`,
     # and we don't want to mix them up.
     if not isinstance(val, int) or isinstance(val, bool):
@@ -28,7 +28,7 @@ def structure_int(val: Any) -> int:
 
 
 @simple_structure
-def structure_float(val: Any) -> float:
+def structure_into_float(val: Any) -> float:
     # Allow integers as well, even though `int` is not a subclass of `float` in Python.
     if not isinstance(val, (int, float)):
         raise StructuringError("The value must be a floating-point number")
@@ -36,27 +36,27 @@ def structure_float(val: Any) -> float:
 
 
 @simple_structure
-def structure_bool(val: Any) -> bool:
+def structure_into_bool(val: Any) -> bool:
     if not isinstance(val, bool):
         raise StructuringError("The value must be a boolean")
     return val
 
 
 @simple_structure
-def structure_bytes(val: Any) -> bytes:
+def structure_into_bytes(val: Any) -> bytes:
     if not isinstance(val, bytes):
         raise StructuringError("The value must be a bytestring")
     return val
 
 
 @simple_structure
-def structure_str(val: Any) -> str:
+def structure_into_str(val: Any) -> str:
     if not isinstance(val, str):
         raise StructuringError("The value must be a string")
     return val
 
 
-def structure_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
     exceptions = []
     args = get_args(structure_into)
     for arg in args:
@@ -71,7 +71,7 @@ def structure_union(structurer: Structurer, structure_into: type, val: Any) -> A
     return result
 
 
-def structure_tuple(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any) -> Any:
     elem_types = get_args(structure_into)
 
     if not isinstance(val, (list, tuple)):
@@ -110,7 +110,7 @@ def structure_tuple(structurer: Structurer, structure_into: type, val: Any) -> A
     return tuple(result)
 
 
-def structure_list(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_list(structurer: Structurer, structure_into: type, val: Any) -> Any:
     (item_type,) = get_args(structure_into)
     if not isinstance(val, (list, tuple)):
         raise StructuringError("Can only structure a tuple or a list into a list generic")
@@ -129,7 +129,7 @@ def structure_list(structurer: Structurer, structure_into: type, val: Any) -> An
     return result
 
 
-def structure_dict(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) -> Any:
     key_type, value_type = get_args(structure_into)
     if not isinstance(val, dict):
         raise StructuringError("Can only structure a dict into a dict generic")
@@ -156,7 +156,7 @@ def structure_dict(structurer: Structurer, structure_into: type, val: Any) -> An
     return result
 
 
-class StructureDataclassFromList(PredicateHandler):
+class StructureListIntoDataclass(PredicateHandler):
     def applies(self, structure_into, obj):
         return is_dataclass(structure_into) and isinstance(obj, list)
 
@@ -188,7 +188,7 @@ class StructureDataclassFromList(PredicateHandler):
         return structure_into(**results)
 
 
-class StructureDataclassFromDict(PredicateHandler):
+class StructureDictIntoDataclass(PredicateHandler):
     def __init__(self, name_converter=lambda name, metadata: name):
         self._name_converter = name_converter
 

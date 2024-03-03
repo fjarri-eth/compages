@@ -5,18 +5,18 @@ from typing import Dict, List, NewType, Tuple, Union
 import pytest
 
 from ordinatio import (
-    StructureDataclassFromDict,
-    StructureDataclassFromList,
+    StructureDictIntoDataclass,
+    StructureListIntoDataclass,
     Structurer,
     StructuringError,
     simple_structure,
-    structure_dict,
-    structure_int,
-    structure_list,
-    structure_none,
-    structure_str,
-    structure_tuple,
-    structure_union,
+    structure_into_dict,
+    structure_into_int,
+    structure_into_list,
+    structure_into_none,
+    structure_into_str,
+    structure_into_tuple,
+    structure_into_union,
 )
 from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -67,12 +67,12 @@ def test_structure_routing():
 
     structurer = Structurer(
         handlers={
-            int: structure_int,
+            int: structure_into_int,
             HexInt: structure_hex_int,
             List[int]: structure_custom_generic,
-            list: structure_list,
+            list: structure_into_list,
         },
-        predicate_handlers=[StructureDataclassFromDict()],
+        predicate_handlers=[StructureDictIntoDataclass()],
     )
 
     result = structurer.structure(
@@ -97,7 +97,7 @@ def test_structure_routing_handler_not_found():
 
 def test_structure_routing_error_wrapping():
     structurer = Structurer(
-        handlers={int: structure_int}, predicate_handlers=[StructureDataclassFromDict()]
+        handlers={int: structure_into_int}, predicate_handlers=[StructureDictIntoDataclass()]
     )
 
     @dataclass
@@ -127,13 +127,13 @@ def test_error_rendering():
 
     structurer = Structurer(
         handlers={
-            Union: structure_union,
-            list: structure_list,
-            dict: structure_dict,
-            int: structure_int,
-            str: structure_str,
+            Union: structure_into_union,
+            list: structure_into_list,
+            dict: structure_into_dict,
+            int: structure_into_int,
+            str: structure_into_str,
         },
-        predicate_handlers=[StructureDataclassFromDict()],
+        predicate_handlers=[StructureDictIntoDataclass()],
     )
 
     data = {"x": "a", "y": {"u": 1.2, "d": {"a": "b", 1: 2}, "l": [1, "a"]}}

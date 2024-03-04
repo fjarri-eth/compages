@@ -1,9 +1,9 @@
 from dataclasses import fields, is_dataclass
 from functools import wraps
-from typing import Any, Iterable, List, Optional, Sequence, get_args
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, get_args
 
 from ._unstructure import IR, PredicateUnstructureHandler, UnstructuringError
-from .path import ListElem, StructField, UnionVariant
+from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 def simple_unstructure(func):
@@ -180,6 +180,6 @@ class UnstructureAsDataclass(PredicateUnstructureHandler):
                 exceptions.append((StructField(field.name), exc))
 
         if exceptions:
-            raise UnstructuringError(f"Cannot unstructure as {structure_into}", exceptions)
+            raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
 
         return result

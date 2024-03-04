@@ -165,7 +165,7 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
         self._name_converter = name_converter
 
     def applies(self, unstructure_as, val):
-        return is_dataclass(unstructure_as)
+        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
     def __call__(self, unstructurer, unstructure_as, val):
         result = {}
@@ -187,7 +187,7 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
 
 class UnstructureDataclassToList(PredicateUnstructureHandler):
     def applies(self, unstructure_as, val):
-        return is_dataclass(unstructure_as)
+        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
     def __call__(self, unstructurer, unstructure_as, val):
         result = []

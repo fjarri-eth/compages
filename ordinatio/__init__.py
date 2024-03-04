@@ -24,7 +24,8 @@ from ._unstructure import (
     UnstructuringError,
 )
 from ._unstructure_handlers import (
-    UnstructureAsDataclass,
+    UnstructureDataclassToDict,
+    UnstructureDataclassToList,
     simple_unstructure,
     unstructure_as_bool,
     unstructure_as_bytes,

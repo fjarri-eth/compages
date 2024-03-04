@@ -160,7 +160,7 @@ def unstructure_as_list(unstructurer: "Unstructurer", unstructure_as: type, val:
     return result
 
 
-class UnstructureAsDataclass(PredicateUnstructureHandler):
+class UnstructureDataclassToDict(PredicateUnstructureHandler):
     def __init__(self, name_converter=lambda name, metadata: name):
         self._name_converter = name_converter
 
@@ -176,6 +176,25 @@ class UnstructureAsDataclass(PredicateUnstructureHandler):
                 result[result_name] = unstructurer.unstructure_as(
                     field.type, getattr(val, field.name)
                 )
+            except UnstructuringError as exc:  # noqa: PERF203
+                exceptions.append((StructField(field.name), exc))
+
+        if exceptions:
+            raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+
+        return result
+
+
+class UnstructureDataclassToList(PredicateUnstructureHandler):
+    def applies(self, unstructure_as, val):
+        return is_dataclass(unstructure_as)
+
+    def __call__(self, unstructurer, unstructure_as, val):
+        result = []
+        exceptions = []
+        for field in fields(unstructure_as):
+            try:
+                result.append(unstructurer.unstructure_as(field.type, getattr(val, field.name)))
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 

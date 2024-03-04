@@ -5,7 +5,7 @@ from typing import List, NewType
 import pytest
 
 from ordinatio import (
-    UnstructureAsDataclass,
+    UnstructureDataclassToDict,
     Unstructurer,
     UnstructuringError,
     simple_unstructure,
@@ -61,7 +61,7 @@ def test_unstructure_routing():
             List[int]: unstructure_as_custom_generic,
             list: unstructure_as_list,
         },
-        predicate_handlers=[UnstructureAsDataclass()],
+        predicate_handlers=[UnstructureDataclassToDict()],
     )
 
     result = unstructurer.unstructure_as(

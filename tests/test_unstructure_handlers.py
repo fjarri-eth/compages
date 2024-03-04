@@ -5,7 +5,8 @@ from typing import Dict, List, NewType, Tuple, Union
 import pytest
 
 from ordinatio import (
-    UnstructureAsDataclass,
+    UnstructureDataclassToDict,
+    UnstructureDataclassToList,
     Unstructurer,
     UnstructuringError,
     simple_unstructure,
@@ -206,11 +207,11 @@ def test_unstructure_as_dict():
     assert_exception_matches(exc.value, expected)
 
 
-def test_unstructure_as_dataclass():
+def test_unstructure_dataclass_to_dict():
     unstructurer = Unstructurer(
         handlers={int: unstructure_as_int, str: unstructure_as_str},
         predicate_handlers=[
-            UnstructureAsDataclass(name_converter=lambda name, metadata: name + "_")
+            UnstructureDataclassToDict(name_converter=lambda name, metadata: name + "_")
         ],
     )
 
@@ -218,13 +219,36 @@ def test_unstructure_as_dataclass():
     class Container:
         x: int
         y: str
-        z: str = "default"
+        z: str
 
     assert unstructurer.unstructure_as(Container, Container(x=1, y="a", z="b")) == {
         "x_": 1,
         "y_": "a",
         "z_": "b",
     }
+
+    with pytest.raises(UnstructuringError) as exc:
+        unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
+    expected = UnstructuringError(
+        "Cannot unstructure as",
+        [(StructField("y"), UnstructuringError("The value must be a string"))],
+    )
+    assert_exception_matches(exc.value, expected)
+
+
+def test_unstructure_dataclass_to_list():
+    unstructurer = Unstructurer(
+        handlers={int: unstructure_as_int, str: unstructure_as_str},
+        predicate_handlers=[UnstructureDataclassToList()],
+    )
+
+    @dataclass
+    class Container:
+        x: int
+        y: str
+        z: str
+
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="a", z="b")) == [1, "a", "b"]
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))

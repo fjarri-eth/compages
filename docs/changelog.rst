@@ -2,7 +2,17 @@ Changelog
 ---------
 
 
-0.1.0 (unreleased)
+0.2.0 (2024-03-05)
 ~~~~~~~~~~~~~~~~~~
 
-Under construction.
+Changed
+=======
+
+- Minimum Python version bumped to 3.10.
+
+
+
+0.1.0 (2024-03-04)
+~~~~~~~~~~~~~~~~~~
+
+Initial version.

@@ -1,6 +1,8 @@
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import fields, is_dataclass
 from functools import wraps
-from typing import Any, Callable, List, Mapping, Sequence, Tuple, get_args
+from types import MappingProxyType
+from typing import Any, get_args
 
 from ._unstructure import PredicateUnstructureHandler, Unstructurer, UnstructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
@@ -60,7 +62,7 @@ def unstructure_as_str(val: Any) -> str:
 def unstructure_as_union(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
     variants = get_args(unstructure_as)
 
-    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for variant in variants:
         try:
             return unstructurer.unstructure_as(variant, val)
@@ -76,13 +78,7 @@ def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: Any, val: A
 
     elem_types = get_args(unstructure_as)
 
-    # Tuple[()] is supposed to represent an empty tuple. Mypy knows this,
-    # but in Python < 3.11 `get_args(Tuple[()])` returns `((),)` instead of `()` as it should.
-    # Fixing it here.
-    if elem_types == ((),):
-        elem_types = ()
-
-    # Homogeneous tuples (Tuple[some_type, ...])
+    # Homogeneous tuples (tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
         elem_types = tuple(elem_types[0] for _ in range(len(val)))
 
@@ -96,8 +92,8 @@ def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: Any, val: A
         )
 
     result = []
-    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
-    for index, (item, tp) in enumerate(zip(val, elem_types)):
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
+    for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
         try:
             result.append(unstructurer.unstructure_as(tp, item))
         except UnstructuringError as exc:  # noqa: PERF203
@@ -116,7 +112,7 @@ def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: A
     key_type, value_type = get_args(unstructure_as)
 
     result = {}
-    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for key, value in val.items():
         success = True
         try:
@@ -140,14 +136,14 @@ def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: A
     return result
 
 
-def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: List[Any]) -> Any:
+def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: list[Any]) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a list")
 
     (item_type,) = get_args(unstructure_as)
 
     result = []
-    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for index, item in enumerate(val):
         try:
             result.append(unstructurer.unstructure_as(item_type, item))
@@ -163,7 +159,8 @@ def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: L
 class UnstructureDataclassToDict(PredicateUnstructureHandler):
     def __init__(
         self,
-        name_converter: Callable[[str, Mapping[Any, Any]], str] = lambda name, _metadata: name,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
     ):
         self._name_converter = name_converter
 
@@ -172,7 +169,7 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
 
     def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = {}
-        exceptions: List[Tuple[PathElem, UnstructuringError]] = []
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for field in fields(unstructure_as):
             result_name = self._name_converter(field.name, field.metadata)
             try:
@@ -194,7 +191,7 @@ class UnstructureDataclassToList(PredicateUnstructureHandler):
 
     def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = []
-        exceptions: List[Tuple[PathElem, UnstructuringError]] = []
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for field in fields(unstructure_as):
             try:
                 result.append(unstructurer.unstructure_as(field.type, getattr(val, field.name)))

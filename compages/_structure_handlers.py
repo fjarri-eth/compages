@@ -1,6 +1,8 @@
+from collections.abc import Callable
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
-from typing import Any, Callable, List, Mapping, Tuple, get_args
+from types import MappingProxyType
+from typing import Any, get_args
 
 from ._structure import PredicateStructureHandler, Structurer, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
@@ -32,7 +34,7 @@ def structure_into_int(val: Any) -> int:
 @simple_structure
 def structure_into_float(val: Any) -> float:
     # Allow integers as well, even though `int` is not a subclass of `float` in Python.
-    if not isinstance(val, (int, float)):
+    if not isinstance(val, int | float):
         raise StructuringError("The value must be a floating-point number")
     return float(val)
 
@@ -61,7 +63,7 @@ def structure_into_str(val: Any) -> str:
 def structure_into_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
     variants = get_args(structure_into)
 
-    exceptions: List[Tuple[PathElem, StructuringError]] = []
+    exceptions: list[tuple[PathElem, StructuringError]] = []
     for variant in variants:
         try:
             return structurer.structure_into(variant, val)
@@ -72,18 +74,12 @@ def structure_into_union(structurer: Structurer, structure_into: type, val: Any)
 
 
 def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    if not isinstance(val, (list, tuple)):
+    if not isinstance(val, list | tuple):
         raise StructuringError("Can only structure a tuple or a list into a tuple generic")
 
     elem_types = get_args(structure_into)
 
-    # Tuple[()] is supposed to represent an empty tuple. Mypy knows this,
-    # but in Python < 3.11 `get_args(Tuple[()])` returns `((),)` instead of `()` as it should.
-    # Fixing it here.
-    if elem_types == ((),):
-        elem_types = ()
-
-    # Homogeneous tuples (Tuple[some_type, ...])
+    # Homogeneous tuples (tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
         elem_types = tuple(elem_types[0] for _ in range(len(val)))
 
@@ -97,8 +93,8 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
         )
 
     result = []
-    exceptions: List[Tuple[PathElem, StructuringError]] = []
-    for index, (item, tp) in enumerate(zip(val, elem_types)):
+    exceptions: list[tuple[PathElem, StructuringError]] = []
+    for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
         try:
             result.append(structurer.structure_into(tp, item))
         except StructuringError as exc:  # noqa: PERF203
@@ -111,13 +107,13 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
 
 
 def structure_into_list(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    if not isinstance(val, (list, tuple)):
+    if not isinstance(val, list | tuple):
         raise StructuringError("Can only structure a tuple or a list into a list generic")
 
     (item_type,) = get_args(structure_into)
 
     result = []
-    exceptions: List[Tuple[PathElem, StructuringError]] = []
+    exceptions: list[tuple[PathElem, StructuringError]] = []
     for index, item in enumerate(val):
         try:
             result.append(structurer.structure_into(item_type, item))
@@ -137,7 +133,7 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
     key_type, value_type = get_args(structure_into)
 
     result = {}
-    exceptions: List[Tuple[PathElem, StructuringError]] = []
+    exceptions: list[tuple[PathElem, StructuringError]] = []
     for key, value in val.items():
         success = True
 
@@ -168,7 +164,7 @@ class StructureListIntoDataclass(PredicateStructureHandler):
 
     def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
         results = {}
-        exceptions: List[Tuple[PathElem, StructuringError]] = []
+        exceptions: list[tuple[PathElem, StructuringError]] = []
 
         struct_fields = fields(structure_into)
 
@@ -197,7 +193,8 @@ class StructureListIntoDataclass(PredicateStructureHandler):
 class StructureDictIntoDataclass(PredicateStructureHandler):
     def __init__(
         self,
-        name_converter: Callable[[str, Mapping[Any, Any]], str] = lambda name, _metadata: name,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
     ):
         self._name_converter = name_converter
 
@@ -206,7 +203,7 @@ class StructureDictIntoDataclass(PredicateStructureHandler):
 
     def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
         results = {}
-        exceptions: List[Tuple[PathElem, StructuringError]] = []
+        exceptions: list[tuple[PathElem, StructuringError]] = []
         for field in fields(structure_into):
             obj_name = self._name_converter(field.name, field.metadata)
             if obj_name in obj:

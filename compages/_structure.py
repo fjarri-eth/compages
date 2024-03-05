@@ -1,23 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
-    NewType,
-    Tuple,
-    Type,
-    TypeVar,
-    get_origin,
-    overload,
-)
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, NewType, TypeVar, get_origin, overload
 
 from .path import PathElem
 
 
 class StructuringError(Exception):
-    def __init__(self, message: str, inner_errors: List[Tuple[PathElem, "StructuringError"]] = []):
+    def __init__(self, message: str, inner_errors: list[tuple[PathElem, "StructuringError"]] = []):
         super().__init__(message)
         self.message = message
         self.inner_errors = inner_errors
@@ -35,8 +24,8 @@ class StructuringError(Exception):
 
 
 def collect_messages(
-    path: List[PathElem], exc: StructuringError
-) -> List[Tuple[List[PathElem], str]]:
+    path: list[PathElem], exc: StructuringError
+) -> list[tuple[list[PathElem], str]]:
     result = [(path, exc.message)]
     for path_elem, inner_exc in exc.inner_errors:
         result.extend(collect_messages([*path, path_elem], inner_exc))
@@ -59,7 +48,7 @@ class Structurer:
     def structure_into(self, structure_into: NewType, obj: Any) -> Any: ...
 
     @overload
-    def structure_into(self, structure_into: Type[_T], obj: Any) -> _T: ...
+    def structure_into(self, structure_into: type[_T], obj: Any) -> _T: ...
 
     def structure_into(self, structure_into: Any, obj: Any) -> Any:
         # First check if there is an exact match registered

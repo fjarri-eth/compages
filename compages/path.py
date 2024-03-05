@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 
 @dataclass
@@ -52,4 +52,4 @@ class DictValue:
         return f"[{self.key}]"
 
 
-PathElem = Union[StructField, UnionVariant, ListElem, DictKey, DictValue]
+PathElem = StructField | UnionVariant | ListElem | DictKey | DictValue

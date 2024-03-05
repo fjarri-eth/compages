@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union
+from types import UnionType
 
 import pytest
 from compages import (
@@ -28,7 +28,7 @@ def assert_exception_matches(exc, reference_exc):
     assert re.match(reference_exc.message, exc.message)
     assert len(exc.inner_errors) == len(reference_exc.inner_errors)
     for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
-        exc.inner_errors, reference_exc.inner_errors
+        exc.inner_errors, reference_exc.inner_errors, strict=True
     ):
         assert inner_path == ref_path
         assert_exception_matches(inner_exc, ref_exc)
@@ -109,15 +109,15 @@ def test_structure_into_int():
 
 def test_structure_into_union():
     structurer = Structurer(
-        handlers={Union: structure_into_union, int: structure_into_int, str: structure_into_str}
+        handlers={UnionType: structure_into_union, int: structure_into_int, str: structure_into_str}
     )
-    assert structurer.structure_into(Union[int, str], "a") == "a"
-    assert structurer.structure_into(Union[int, str], 1) == 1
+    assert structurer.structure_into(int | str, "a") == "a"
+    assert structurer.structure_into(int | str, 1) == 1
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Union[int, str], 1.2)
+        structurer.structure_into(int | str, 1.2)
     expected = StructuringError(
-        r"Cannot structure into typing\.Union\[int, str\]",
+        r"Cannot structure into int | str",
         [
             (UnionVariant(int), StructuringError("The value must be an integer")),
             (UnionVariant(str), StructuringError("The value must be a string")),
@@ -131,30 +131,30 @@ def test_structure_into_tuple():
         handlers={tuple: structure_into_tuple, int: structure_into_int, str: structure_into_str}
     )
 
-    assert structurer.structure_into(Tuple[()], []) == ()
-    assert structurer.structure_into(Tuple[int, str], [1, "a"]) == (1, "a")
-    assert structurer.structure_into(Tuple[int, str], (1, "a")) == (1, "a")
-    assert structurer.structure_into(Tuple[int, ...], (1, 2, 3)) == (1, 2, 3)
+    assert structurer.structure_into(tuple[()], []) == ()
+    assert structurer.structure_into(tuple[int, str], [1, "a"]) == (1, "a")
+    assert structurer.structure_into(tuple[int, str], (1, "a")) == (1, "a")
+    assert structurer.structure_into(tuple[int, ...], (1, 2, 3)) == (1, 2, 3)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Tuple[int, str], {"x": 1, "y": "a"})
+        structurer.structure_into(tuple[int, str], {"x": 1, "y": "a"})
     expected = StructuringError("Can only structure a tuple or a list into a tuple generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Tuple[int, str, int], [1, "a"])
+        structurer.structure_into(tuple[int, str, int], [1, "a"])
     expected = StructuringError("Not enough elements to structure into a tuple: got 2, need 3")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Tuple[int], [1, "a"])
+        structurer.structure_into(tuple[int], [1, "a"])
     expected = StructuringError("Too many elements to structure into a tuple: got 2, need 1")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Tuple[int, str], [1, 1.2])
+        structurer.structure_into(tuple[int, str], [1, 1.2])
     expected = StructuringError(
-        r"Cannot structure into typing\.Tuple\[int, str\]",
+        r"Cannot structure into tuple\[int, str\]",
         [(ListElem(1), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -163,18 +163,18 @@ def test_structure_into_tuple():
 def test_structure_into_list():
     structurer = Structurer(handlers={list: structure_into_list, int: structure_into_int})
 
-    assert structurer.structure_into(List[int], [1, 2, 3]) == [1, 2, 3]
-    assert structurer.structure_into(List[int], (1, 2, 3)) == [1, 2, 3]
+    assert structurer.structure_into(list[int], [1, 2, 3]) == [1, 2, 3]
+    assert structurer.structure_into(list[int], (1, 2, 3)) == [1, 2, 3]
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(List[int], {"x": 1, "y": "a"})
+        structurer.structure_into(list[int], {"x": 1, "y": "a"})
     expected = StructuringError("Can only structure a tuple or a list into a list generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(List[int], [1, "a"])
+        structurer.structure_into(list[int], [1, "a"])
     expected = StructuringError(
-        r"Cannot structure into typing\.List\[int\]",
+        r"Cannot structure into list\[int\]",
         [(ListElem(1), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -185,27 +185,27 @@ def test_structure_into_dict():
         handlers={dict: structure_into_dict, int: structure_into_int, str: structure_into_str}
     )
 
-    assert structurer.structure_into(Dict[int, str], {1: "a", 2: "b"}) == {1: "a", 2: "b"}
+    assert structurer.structure_into(dict[int, str], {1: "a", 2: "b"}) == {1: "a", 2: "b"}
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Dict[int, str], [(1, "a"), (2, "b")])
+        structurer.structure_into(dict[int, str], [(1, "a"), (2, "b")])
     expected = StructuringError("Can only structure a dict into a dict generic")
     assert_exception_matches(exc.value, expected)
 
     # Error structuring a key
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Dict[int, str], {"a": "b", 2: "c"})
+        structurer.structure_into(dict[int, str], {"a": "b", 2: "c"})
     expected = StructuringError(
-        r"Cannot structure into typing\.Dict\[int, str\]",
+        r"Cannot structure into dict\[int, str\]",
         [(DictKey("a"), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
 
     # Error structuring a value
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Dict[int, str], {1: "a", 2: 3})
+        structurer.structure_into(dict[int, str], {1: "a", 2: 3})
     expected = StructuringError(
-        r"Cannot structure into typing\.Dict\[int, str\]",
+        r"Cannot structure into dict\[int, str\]",
         [(DictValue(2), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)

@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List, NewType, Union
+from types import UnionType
+from typing import NewType
 
 import pytest
 from compages import (
@@ -34,7 +35,7 @@ def assert_exception_matches(exc, reference_exc):
     assert re.match(reference_exc.message, exc.message)
     assert len(exc.inner_errors) == len(reference_exc.inner_errors)
     for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
-        exc.inner_errors, reference_exc.inner_errors
+        exc.inner_errors, reference_exc.inner_errors, strict=True
     ):
         assert inner_path == ref_path
         assert_exception_matches(inner_exc, ref_exc)
@@ -52,9 +53,9 @@ def test_structure_routing():
         # a newtype with no handler, will fallback to the `int` handler
         other_int: OtherInt
         # will be routed to the handler for all `list` generics
-        generic: List[HexInt]
-        # will have a specific `List[int]` handler, which takes priority over the generic `list` one
-        custom_generic: List[int]
+        generic: list[HexInt]
+        # will have a specific `list[int]` handler, which takes priority over the generic `list` one
+        custom_generic: list[int]
 
     @simple_structure
     def structure_custom_generic(val):
@@ -66,7 +67,7 @@ def test_structure_routing():
         handlers={
             int: structure_into_int,
             HexInt: structure_hex_int,
-            List[int]: structure_custom_generic,
+            list[int]: structure_custom_generic,
             list: structure_into_list,
         },
         predicate_handlers=[StructureDictIntoDataclass()],
@@ -113,9 +114,9 @@ def test_structure_routing_error_wrapping():
 def test_error_rendering():
     @dataclass
     class Inner:
-        u: Union[int, str]
-        d: Dict[int, str]
-        lst: List[int]
+        u: int | str
+        d: dict[int, str]
+        lst: list[int]
 
     @dataclass
     class Outer:
@@ -124,7 +125,7 @@ def test_error_rendering():
 
     structurer = Structurer(
         handlers={
-            Union: structure_into_union,
+            UnionType: structure_into_union,
             list: structure_into_list,
             dict: structure_into_dict,
             int: structure_into_int,
@@ -148,7 +149,7 @@ def test_error_rendering():
                         (
                             StructField("u"),
                             StructuringError(
-                                r"Cannot structure into typing\.Union\[int, str\]",
+                                r"Cannot structure into int | str",
                                 [
                                     (
                                         UnionVariant(int),
@@ -164,7 +165,7 @@ def test_error_rendering():
                         (
                             StructField("d"),
                             StructuringError(
-                                r"Cannot structure into typing\.Dict\[int, str\]",
+                                r"Cannot structure into dict\[int, str\]",
                                 [
                                     (
                                         DictKey("a"),
@@ -177,7 +178,7 @@ def test_error_rendering():
                         (
                             StructField("lst"),
                             StructuringError(
-                                r"Cannot structure into typing\.List\[int\]",
+                                r"Cannot structure into list\[int\]",
                                 [(ListElem(1), StructuringError("The value must be an integer"))],
                             ),
                         ),
@@ -193,13 +194,13 @@ def test_error_rendering():
 Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Outer'>
   x: The value must be an integer
   y: Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Inner'>
-    y.u: Cannot structure into typing.Union[int, str]
+    y.u: Cannot structure into int | str
       y.u.<int>: The value must be an integer
       y.u.<str>: The value must be a string
-    y.d: Cannot structure into typing.Dict[int, str]
+    y.d: Cannot structure into dict[int, str]
       y.d.key(a): The value must be an integer
       y.d.[1]: The value must be a string
-    y.lst: Cannot structure into typing.List[int]
+    y.lst: Cannot structure into list[int]
       y.lst.[1]: The value must be an integer
 """.strip()  # noqa: E501
 

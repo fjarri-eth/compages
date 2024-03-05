@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v3
@@ -33,8 +33,7 @@ jobs:
       run: |
         pdm run py.test --cov=compages --cov-report=xml tests
     - name: Upload coverage
-      # Some compatibility branches are only active in 3.8
-      if: matrix.python-version == '3.10' || matrix.python-version == '3.8'
+      if: matrix.python-version == '3.10'
       run: |
         curl -Os https://uploader.codecov.io/latest/linux/codecov
         chmod +x codecov
@@ -45,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8"]
+        python-version: ["3.10"]
 
     steps:
     - uses: actions/checkout@v3

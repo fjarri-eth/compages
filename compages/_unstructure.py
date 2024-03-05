@@ -1,6 +1,4 @@
-import sys
 from abc import ABC, abstractmethod
-from types import FunctionType
 from typing import Any, Callable, Iterable, List, Mapping, NewType, Tuple, get_origin
 
 from .path import PathElem
@@ -37,16 +35,8 @@ class Unstructurer:
         handler = self._handlers.get(unstructure_as, None)
 
         # If it's a newtype, try to fall back to a handler for the wrapped type
-        if handler is None:
-            if sys.version_info < (3, 10):
-                # A bit brittle, but there doesn't seem to be a better way.
-                is_newtype = isinstance(unstructure_as, FunctionType) and hasattr(
-                    unstructure_as, "__supertype__"
-                )
-            else:
-                is_newtype = isinstance(unstructure_as, NewType)
-            if is_newtype:
-                handler = self._handlers.get(unstructure_as.__supertype__, None)
+        if handler is None and isinstance(unstructure_as, NewType):
+            handler = self._handlers.get(unstructure_as.__supertype__, None)
 
         # If it's a generic, see if there is a handler for the generic origin
         if handler is None:

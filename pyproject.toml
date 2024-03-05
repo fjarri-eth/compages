@@ -125,6 +125,10 @@ ignore = [
     "TCH002",
     # A meme problem that is blown way out of proportion
     "B006",
+    # Not needed.
+    "D100", "D104",
+    # Would be nice if it didn't trigger on `__str__()` too.
+    "D105",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

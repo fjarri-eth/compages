@@ -1,15 +1,13 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List, NewType, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pytest
-
 from ordinatio import (
     StructureDictIntoDataclass,
     StructureListIntoDataclass,
     Structurer,
     StructuringError,
-    simple_structure,
     structure_into_bool,
     structure_into_bytes,
     structure_into_dict,
@@ -52,7 +50,8 @@ def test_structure_into_float():
 
     # Specifically allow integers, but check that they are converted to floats.
     res = structurer.structure_into(float, 1)
-    assert isinstance(res, float) and res == 1.0
+    assert isinstance(res, float)
+    assert res == 1.0
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(float, "a")
@@ -253,7 +252,7 @@ def test_structure_dataclass_from_dict():
     structurer = Structurer(
         handlers={int: structure_into_int, str: structure_into_str},
         predicate_handlers=[
-            StructureDictIntoDataclass(name_converter=lambda name, metadata: name + "_")
+            StructureDictIntoDataclass(name_converter=lambda name, _metadata: name + "_")
         ],
     )
 

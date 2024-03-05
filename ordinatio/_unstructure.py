@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from dataclasses import fields, is_dataclass
 from typing import (
     Any,
     Callable,
@@ -7,9 +6,7 @@ from typing import (
     List,
     Mapping,
     NewType,
-    Optional,
     Union,
-    get_args,
     get_origin,
 )
 

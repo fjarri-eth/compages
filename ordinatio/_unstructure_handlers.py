@@ -1,14 +1,14 @@
 from dataclasses import fields, is_dataclass
 from functools import wraps
-from typing import Any, Iterable, List, Mapping, Optional, Sequence, get_args
+from typing import Any, List, Mapping, Optional, Sequence, get_args
 
-from ._unstructure import IR, PredicateUnstructureHandler, UnstructuringError
+from ._unstructure import IR, PredicateUnstructureHandler, Unstructurer, UnstructuringError
 from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 def simple_unstructure(func):
     @wraps(func)
-    def _wrapped(unstructurer, unstructure_as, val):
+    def _wrapped(_unstructurer, _unstructure_as, val):
         return func(val)
 
     return _wrapped
@@ -59,7 +59,7 @@ def unstructure_as_str(val: Any) -> str:
 
 
 def unstructure_as_union(
-    unstructurer: "Unstructurer", unstructure_as: type, val: Optional[Any]
+    unstructurer: Unstructurer, unstructure_as: type, val: Optional[Any]
 ) -> IR:
     variants = get_args(unstructure_as)
 
@@ -67,13 +67,13 @@ def unstructure_as_union(
     for variant in variants:
         try:
             return unstructurer.unstructure_as(variant, val)
-        except UnstructuringError as exc:
+        except UnstructuringError as exc:  # noqa: PERF203
             exceptions.append((UnionVariant(variant), exc))
 
     raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
 
 
-def unstructure_as_tuple(unstructurer: "Unstructurer", unstructure_as: type, val: Any) -> Any:
+def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: type, val: Any) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a tuple")
 
@@ -112,7 +112,7 @@ def unstructure_as_tuple(unstructurer: "Unstructurer", unstructure_as: type, val
     return result
 
 
-def unstructure_as_dict(unstructurer: "Unstructurer", unstructure_as: type, val: Any) -> Any:
+def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: Any) -> Any:
     if not isinstance(val, Mapping):
         raise UnstructuringError("Can only unstructure a Mapping as a dict")
 
@@ -120,19 +120,22 @@ def unstructure_as_dict(unstructurer: "Unstructurer", unstructure_as: type, val:
 
     result = {}
     exceptions = []
-    for index, (key, value) in enumerate(val.items()):
-        # Note that we're not using `key` for the path, since it can be anything.
+    for key, value in val.items():
+        success = True
         try:
-            structured_key = unstructurer.unstructure_as(key_type, key)
-        except UnstructuringError as exc:  # noqa: PERF203
+            unstructured_key = unstructurer.unstructure_as(key_type, key)
+        except UnstructuringError as exc:
+            success = False
             exceptions.append((DictKey(key), exc))
 
         try:
-            structured_value = unstructurer.unstructure_as(value_type, value)
-        except UnstructuringError as exc:  # noqa: PERF203
+            unstructured_value = unstructurer.unstructure_as(value_type, value)
+        except UnstructuringError as exc:
+            success = False
             exceptions.append((DictValue(key), exc))
 
-        result[key] = value
+        if success:
+            result[unstructured_key] = unstructured_value
 
     if exceptions:
         raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
@@ -140,7 +143,7 @@ def unstructure_as_dict(unstructurer: "Unstructurer", unstructure_as: type, val:
     return result
 
 
-def unstructure_as_list(unstructurer: "Unstructurer", unstructure_as: type, val: List[Any]) -> IR:
+def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: List[Any]) -> IR:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a list")
 
@@ -161,7 +164,7 @@ def unstructure_as_list(unstructurer: "Unstructurer", unstructure_as: type, val:
 
 
 class UnstructureDataclassToDict(PredicateUnstructureHandler):
-    def __init__(self, name_converter=lambda name, metadata: name):
+    def __init__(self, name_converter=lambda name, _metadata: name):
         self._name_converter = name_converter
 
     def applies(self, unstructure_as, val):
@@ -176,7 +179,7 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
                 result[result_name] = unstructurer.unstructure_as(
                     field.type, getattr(val, field.name)
                 )
-            except UnstructuringError as exc:  # noqa: PERF203
+            except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
         if exceptions:

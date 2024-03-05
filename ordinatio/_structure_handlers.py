@@ -1,6 +1,6 @@
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
-from typing import Any, get_args, get_origin
+from typing import Any, get_args
 
 from ._structure import PredicateStructureHandler, Structurer, StructuringError
 from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
@@ -8,7 +8,7 @@ from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 def simple_structure(func):
     @wraps(func)
-    def _wrapped(structurer, structure_into, val):
+    def _wrapped(_structurer, _structure_into, val):
         return func(val)
 
     return _wrapped
@@ -65,7 +65,7 @@ def structure_into_union(structurer: Structurer, structure_into: type, val: Any)
     for variant in variants:
         try:
             return structurer.structure_into(variant, val)
-        except StructuringError as exc:
+        except StructuringError as exc:  # noqa: PERF203
             exceptions.append((UnionVariant(variant), exc))
 
     raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
@@ -138,19 +138,23 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
 
     result = {}
     exceptions = []
-    for index, (key, value) in enumerate(val.items()):
-        # Note that we're not using `key` for the path, since it can be anything.
+    for key, value in val.items():
+        success = True
+
         try:
             structured_key = structurer.structure_into(key_type, key)
-        except StructuringError as exc:  # noqa: PERF203
+        except StructuringError as exc:
+            success = False
             exceptions.append((DictKey(key), exc))
 
         try:
             structured_value = structurer.structure_into(value_type, value)
-        except StructuringError as exc:  # noqa: PERF203
+        except StructuringError as exc:
+            success = False
             exceptions.append((DictValue(key), exc))
 
-        result[key] = value
+        if success:
+            result[structured_key] = structured_value
 
     if exceptions:
         raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
@@ -191,7 +195,7 @@ class StructureListIntoDataclass(PredicateStructureHandler):
 
 
 class StructureDictIntoDataclass(PredicateStructureHandler):
-    def __init__(self, name_converter=lambda name, metadata: name):
+    def __init__(self, name_converter=lambda name, _metadata: name):
         self._name_converter = name_converter
 
     def applies(self, structure_into, obj):
@@ -211,7 +215,7 @@ class StructureDictIntoDataclass(PredicateStructureHandler):
                 results[field.name] = field.default
             else:
                 if obj_name == field.name:
-                    message = f"Missing field"
+                    message = "Missing field"
                 else:
                     message = f"Missing field (`{obj_name}` in the input)"
                 exceptions.append((StructField(field.name), StructuringError(message)))

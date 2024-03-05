@@ -123,6 +123,8 @@ ignore = [
     "PERF401",
     # This is only valid if we use `from __future__ import annotations`.
     "TCH002",
+    # A meme problem that is blown way out of proportion
+    "B006",
 ]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.

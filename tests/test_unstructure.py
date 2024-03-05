@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import List, NewType
 
 import pytest
-
 from ordinatio import (
     UnstructureDataclassToDict,
     Unstructurer,
@@ -51,7 +50,8 @@ def test_unstructure_routing():
         # will have a specific `List[int]` handler, which takes priority over the generic `list` one
         custom_generic: List[int]
 
-    def unstructure_as_custom_generic(unstructurer, unstructure_as, val):
+    @simple_unstructure
+    def unstructure_as_custom_generic(val):
         return val
 
     unstructurer = Unstructurer(

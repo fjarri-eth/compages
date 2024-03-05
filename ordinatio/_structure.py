@@ -1,26 +1,17 @@
-import typing
 from abc import ABC, abstractmethod
-from dataclasses import MISSING, fields, is_dataclass
 from typing import (
     Any,
     Callable,
-    Dict,
     Iterable,
     List,
     Mapping,
     NewType,
-    Optional,
-    Sequence,
     Tuple,
     Type,
     TypeVar,
-    Union,
     cast,
-    get_args,
     get_origin,
 )
-
-from .path import PathElem
 
 
 class StructuringError(Exception):
@@ -43,8 +34,8 @@ class StructuringError(Exception):
 
 def collect_messages(path, exc: StructuringError) -> List[Tuple[int, str, str]]:
     result = [(path, exc.message)]
-    for path_elem, exc in exc.inner_errors:
-        result.extend(collect_messages([*path, path_elem], exc))
+    for path_elem, inner_exc in exc.inner_errors:
+        result.extend(collect_messages([*path, path_elem], inner_exc))
     return result
 
 
@@ -55,7 +46,7 @@ class Structurer:
     def __init__(
         self,
         handlers: Mapping[Any, Callable[["Structurer", type, Any], Any]] = {},
-        predicate_handlers: Iterable["PredicateHandler"] = [],
+        predicate_handlers: Iterable["PredicateStructureHandler"] = [],
     ):
         self._handlers = handlers
         self._predicate_handlers = predicate_handlers

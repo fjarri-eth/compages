@@ -1,15 +1,13 @@
 import re
 from dataclasses import dataclass
-from typing import Dict, List, NewType, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pytest
-
 from ordinatio import (
     UnstructureDataclassToDict,
     UnstructureDataclassToList,
     Unstructurer,
     UnstructuringError,
-    simple_unstructure,
     unstructure_as_bool,
     unstructure_as_bytes,
     unstructure_as_dict,
@@ -211,7 +209,7 @@ def test_unstructure_dataclass_to_dict():
     unstructurer = Unstructurer(
         handlers={int: unstructure_as_int, str: unstructure_as_str},
         predicate_handlers=[
-            UnstructureDataclassToDict(name_converter=lambda name, metadata: name + "_")
+            UnstructureDataclassToDict(name_converter=lambda name, _metadata: name + "_")
         ],
     )
 

@@ -18,6 +18,7 @@ HexInt = NewType("HexInt", int)
 OtherInt = NewType("OtherInt", int)
 
 
+# TODO (#5): duplicate
 def assert_exception_matches(exc, reference_exc):
     assert isinstance(exc, UnstructuringError)
     assert re.match(reference_exc.message, exc.message)

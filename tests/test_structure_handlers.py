@@ -22,7 +22,7 @@ from compages import (
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
-# TODO: duplicate
+# TODO (#5): duplicate
 def assert_exception_matches(exc, reference_exc):
     assert isinstance(exc, StructuringError)
     assert re.match(reference_exc.message, exc.message)

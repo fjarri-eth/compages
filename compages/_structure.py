@@ -65,7 +65,7 @@ class Structurer:
                 handler = self._handlers.get(origin, None)
 
         # Check all predicate handlers in order and see if there is one that applies
-        # TODO: should `applies()` raise an exception which we could collect
+        # TODO (#10): should `applies()` raise an exception which we could collect
         # and attach to the error below, to provide more context on why no handlers were found?
         if handler is None:
             for predicate_handler in self._predicate_handlers:

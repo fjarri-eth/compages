@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import List, NewType
+from typing import NewType
 
 import pytest
 from compages import (
@@ -23,7 +23,7 @@ def assert_exception_matches(exc, reference_exc):
     assert re.match(reference_exc.message, exc.message)
     assert len(exc.inner_errors) == len(reference_exc.inner_errors)
     for (inner_path, inner_exc), (ref_path, ref_exc) in zip(
-        exc.inner_errors, reference_exc.inner_errors
+        exc.inner_errors, reference_exc.inner_errors, strict=True
     ):
         assert inner_path == ref_path
         assert_exception_matches(inner_exc, ref_exc)
@@ -46,9 +46,9 @@ def test_unstructure_routing():
         # a newtype with no handler, will fallback to the `int` handler
         other_int: OtherInt
         # will be routed to the handler for all `list` generics
-        generic: List[HexInt]
-        # will have a specific `List[int]` handler, which takes priority over the generic `list` one
-        custom_generic: List[int]
+        generic: list[HexInt]
+        # will have a specific `list[int]` handler, which takes priority over the generic `list` one
+        custom_generic: list[int]
 
     @simple_unstructure
     def unstructure_as_custom_generic(val):
@@ -58,7 +58,7 @@ def test_unstructure_routing():
         handlers={
             int: unstructure_as_int,
             HexInt: unstructure_as_hex_int,
-            List[int]: unstructure_as_custom_generic,
+            list[int]: unstructure_as_custom_generic,
             list: unstructure_as_list,
         },
         predicate_handlers=[UnstructureDataclassToDict()],

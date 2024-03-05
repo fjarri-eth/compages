@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Iterable, List, Mapping, NewType, Tuple, get_origin
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, NewType, get_origin
 
 from .path import PathElem
 
 
 class UnstructuringError(Exception):
     def __init__(
-        self, message: str, inner_errors: List[Tuple[PathElem, "UnstructuringError"]] = []
+        self, message: str, inner_errors: list[tuple[PathElem, "UnstructuringError"]] = []
     ):
         super().__init__(message)
         self.message = message

@@ -79,12 +79,6 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
 
     elem_types = get_args(structure_into)
 
-    # tuple[()] is supposed to represent an empty tuple. Mypy knows this,
-    # but in Python < 3.11 `get_args(tuple[()])` returns `((),)` instead of `()` as it should.
-    # Fixing it here.
-    if elem_types == ((),):
-        elem_types = ()
-
     # Homogeneous tuples (tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
         elem_types = tuple(elem_types[0] for _ in range(len(val)))

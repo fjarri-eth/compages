@@ -1,6 +1,7 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
+from types import MappingProxyType
 from typing import Any, get_args
 
 from ._structure import PredicateStructureHandler, Structurer, StructuringError
@@ -198,7 +199,8 @@ class StructureListIntoDataclass(PredicateStructureHandler):
 class StructureDictIntoDataclass(PredicateStructureHandler):
     def __init__(
         self,
-        name_converter: Callable[[str, Mapping[Any, Any]], str] = lambda name, _metadata: name,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
     ):
         self._name_converter = name_converter
 

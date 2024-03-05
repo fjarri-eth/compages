@@ -1,6 +1,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import fields, is_dataclass
 from functools import wraps
+from types import MappingProxyType
 from typing import Any, get_args
 
 from ._unstructure import PredicateUnstructureHandler, Unstructurer, UnstructuringError
@@ -164,7 +165,8 @@ def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: l
 class UnstructureDataclassToDict(PredicateUnstructureHandler):
     def __init__(
         self,
-        name_converter: Callable[[str, Mapping[Any, Any]], str] = lambda name, _metadata: name,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
     ):
         self._name_converter = name_converter
 

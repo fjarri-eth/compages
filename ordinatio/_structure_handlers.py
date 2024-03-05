@@ -1,14 +1,15 @@
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
-from typing import Any, get_args
+from types import MappingProxyType
+from typing import Any, Callable, List, Tuple, get_args
 
 from ._structure import PredicateStructureHandler, Structurer, StructuringError
-from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
+from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_structure(func):
+def simple_structure(func: Callable[[Any], Any]) -> Callable[[Structurer, Any, Any], Any]:
     @wraps(func)
-    def _wrapped(_structurer, _structure_into, val):
+    def _wrapped(_structurer: Structurer, _structure_into: Any, val: Any) -> Any:
         return func(val)
 
     return _wrapped
@@ -61,7 +62,7 @@ def structure_into_str(val: Any) -> str:
 def structure_into_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
     variants = get_args(structure_into)
 
-    exceptions = []
+    exceptions: List[Tuple[PathElem, StructuringError]] = []
     for variant in variants:
         try:
             return structurer.structure_into(variant, val)
@@ -85,7 +86,7 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
 
     # Homogeneous tuples (Tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
-        elem_types = [elem_types[0] for _ in range(len(val))]
+        elem_types = tuple(elem_types[0] for _ in range(len(val)))
 
     if len(val) < len(elem_types):
         raise StructuringError(
@@ -97,7 +98,7 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
         )
 
     result = []
-    exceptions = []
+    exceptions: List[Tuple[PathElem, StructuringError]] = []
     for index, (item, tp) in enumerate(zip(val, elem_types)):
         try:
             result.append(structurer.structure_into(tp, item))
@@ -117,7 +118,7 @@ def structure_into_list(structurer: Structurer, structure_into: type, val: Any) 
     (item_type,) = get_args(structure_into)
 
     result = []
-    exceptions = []
+    exceptions: List[Tuple[PathElem, StructuringError]] = []
     for index, item in enumerate(val):
         try:
             result.append(structurer.structure_into(item_type, item))
@@ -137,7 +138,7 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
     key_type, value_type = get_args(structure_into)
 
     result = {}
-    exceptions = []
+    exceptions: List[Tuple[PathElem, StructuringError]] = []
     for key, value in val.items():
         success = True
 
@@ -163,12 +164,12 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
 
 
 class StructureListIntoDataclass(PredicateStructureHandler):
-    def applies(self, structure_into, obj):
+    def applies(self, structure_into: Any, obj: Any) -> bool:
         return is_dataclass(structure_into) and isinstance(obj, list)
 
-    def __call__(self, structurer, structure_into, obj):
+    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
         results = {}
-        exceptions = []
+        exceptions: List[Tuple[PathElem, StructuringError]] = []
 
         struct_fields = fields(structure_into)
 
@@ -195,15 +196,19 @@ class StructureListIntoDataclass(PredicateStructureHandler):
 
 
 class StructureDictIntoDataclass(PredicateStructureHandler):
-    def __init__(self, name_converter=lambda name, _metadata: name):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
         self._name_converter = name_converter
 
-    def applies(self, structure_into, obj):
+    def applies(self, structure_into: Any, obj: Any) -> bool:
         return is_dataclass(structure_into) and isinstance(obj, dict)
 
-    def __call__(self, structurer, structure_into, obj):
+    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
         results = {}
-        exceptions = []
+        exceptions: List[Tuple[PathElem, StructuringError]] = []
         for field in fields(structure_into):
             obj_name = self._name_converter(field.name, field.metadata)
             if obj_name in obj:

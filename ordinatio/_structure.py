@@ -9,18 +9,20 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
-    cast,
     get_origin,
+    overload,
 )
+
+from .path import PathElem
 
 
 class StructuringError(Exception):
-    def __init__(self, message: str, inner_errors=[]):
+    def __init__(self, message: str, inner_errors: List[Tuple[PathElem, "StructuringError"]] = []):
         super().__init__(message)
         self.message = message
         self.inner_errors = inner_errors
 
-    def __str__(self):
+    def __str__(self) -> str:
         messages = collect_messages([], self)
 
         _, msg = messages[0]
@@ -32,7 +34,9 @@ class StructuringError(Exception):
         return "\n".join(message_strings)
 
 
-def collect_messages(path, exc: StructuringError) -> List[Tuple[int, str, str]]:
+def collect_messages(
+    path: List[PathElem], exc: StructuringError
+) -> List[Tuple[List[PathElem], str]]:
     result = [(path, exc.message)]
     for path_elem, inner_exc in exc.inner_errors:
         result.extend(collect_messages([*path, path_elem], inner_exc))
@@ -51,7 +55,13 @@ class Structurer:
         self._handlers = handlers
         self._predicate_handlers = predicate_handlers
 
-    def structure_into(self, structure_into: Type[_T], obj: Any) -> _T:
+    @overload
+    def structure_into(self, structure_into: NewType, obj: Any) -> Any: ...
+
+    @overload
+    def structure_into(self, structure_into: Type[_T], obj: Any) -> _T: ...
+
+    def structure_into(self, structure_into: Any, obj: Any) -> Any:
         # First check if there is an exact match registered
         handler = self._handlers.get(structure_into, None)
 
@@ -77,16 +87,12 @@ class Structurer:
         if handler is None:
             raise StructuringError(f"No handlers registered to structure into {structure_into}")
 
-        result = handler(self, structure_into, obj)
-
-        # Python typing is not advanced enough to enforce it,
-        # so we are relying on the handler returning the type it was assigned to.
-        return cast(_T, result)
+        return handler(self, structure_into, obj)
 
 
 class PredicateStructureHandler(ABC):
     @abstractmethod
-    def applies(self, structure_into, obj): ...
+    def applies(self, structure_into: Any, obj: Any) -> bool: ...
 
     @abstractmethod
-    def __call__(self, structurer, structure_into, obj): ...
+    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any: ...

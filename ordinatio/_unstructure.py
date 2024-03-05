@@ -1,35 +1,36 @@
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Mapping,
-    NewType,
-    Union,
-    get_origin,
-)
+from typing import Any, Callable, Iterable, List, Mapping, NewType, Tuple, get_origin
 
-IR = Union[None, bool, int, str, bytes, List["IR"], Dict[str, "IR"]]
+from .path import PathElem
 
 
 class UnstructuringError(Exception):
-    def __init__(self, message: str, inner_errors=[]):
+    def __init__(
+        self, message: str, inner_errors: List[Tuple[PathElem, "UnstructuringError"]] = []
+    ):
         super().__init__(message)
         self.message = message
         self.inner_errors = inner_errors
 
 
+class PredicateUnstructureHandler(ABC):
+    @abstractmethod
+    def applies(self, unstructure_as: Any, val: Any) -> bool: ...
+
+    @abstractmethod
+    def __call__(self, unstructurer: "Unstructurer", unstructure_as: Any, val: Any) -> Any: ...
+
+
 class Unstructurer:
     def __init__(
         self,
-        handlers: Mapping[Any, Callable[["Unstructurer", type, Any], IR]] = {},
-        predicate_handlers=[],
+        handlers: Mapping[Any, Callable[["Unstructurer", Any, Any], Any]] = {},
+        predicate_handlers: Iterable[PredicateUnstructureHandler] = [],
     ):
-        self._handlers = handlers
-        self._predicate_handlers = predicate_handlers
+        self._handlers = dict(handlers)
+        self._predicate_handlers = list(predicate_handlers)
 
-    def unstructure_as(self, unstructure_as: type, val: Any) -> IR:
+    def unstructure_as(self, unstructure_as: Any, val: Any) -> Any:
         # First check if there is an exact match registered
         handler = self._handlers.get(unstructure_as, None)
 
@@ -56,11 +57,3 @@ class Unstructurer:
             raise UnstructuringError(f"No handlers registered to unstructure as {unstructure_as}")
 
         return handler(self, unstructure_as, val)
-
-
-class PredicateUnstructureHandler(ABC):
-    @abstractmethod
-    def applies(self, unstructure_as, val): ...
-
-    @abstractmethod
-    def __call__(self, unstructurer, unstructure_as, val): ...

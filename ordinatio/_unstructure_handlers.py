@@ -1,31 +1,31 @@
 from dataclasses import fields, is_dataclass
 from functools import wraps
-from typing import Any, List, Mapping, Optional, Sequence, get_args
+from types import MappingProxyType
+from typing import Any, Callable, List, Mapping, Sequence, Tuple, get_args
 
-from ._unstructure import IR, PredicateUnstructureHandler, Unstructurer, UnstructuringError
-from .path import DictKey, DictValue, ListElem, StructField, UnionVariant
+from ._unstructure import PredicateUnstructureHandler, Unstructurer, UnstructuringError
+from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_unstructure(func):
+def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[Unstructurer, Any, Any], Any]:
     @wraps(func)
-    def _wrapped(_unstructurer, _unstructure_as, val):
+    def _wrapped(_unstructurer: Unstructurer, _unstructure_as: Any, val: Any) -> Any:
         return func(val)
 
     return _wrapped
 
 
 @simple_unstructure
-def unstructure_as_none(val: None) -> IR:
+def unstructure_as_none(val: Any) -> None:
     if val is not None:
         raise UnstructuringError("The value must be `None`")
-    return None
 
 
 @simple_unstructure
-def unstructure_as_int(val):
+def unstructure_as_int(val: Any) -> int:
     # Handling a special case of `bool` here since in Python `bool` is an `int`,
     # and we don't want to mix them up.
-    if isinstance(val, bool) or not isinstance(val, int):
+    if not isinstance(val, int) or isinstance(val, bool):
         raise UnstructuringError("The value must be an integer")
     return val
 
@@ -58,12 +58,10 @@ def unstructure_as_str(val: Any) -> str:
     return val
 
 
-def unstructure_as_union(
-    unstructurer: Unstructurer, unstructure_as: type, val: Optional[Any]
-) -> IR:
+def unstructure_as_union(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
     variants = get_args(unstructure_as)
 
-    exceptions = []
+    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
     for variant in variants:
         try:
             return unstructurer.unstructure_as(variant, val)
@@ -73,7 +71,7 @@ def unstructure_as_union(
     raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
 
 
-def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: type, val: Any) -> Any:
+def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a tuple")
 
@@ -87,7 +85,7 @@ def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: type, val: 
 
     # Homogeneous tuples (Tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
-        elem_types = [elem_types[0] for _ in range(len(val))]
+        elem_types = tuple(elem_types[0] for _ in range(len(val)))
 
     if len(val) < len(elem_types):
         raise UnstructuringError(
@@ -99,7 +97,7 @@ def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: type, val: 
         )
 
     result = []
-    exceptions = []
+    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
     for index, (item, tp) in enumerate(zip(val, elem_types)):
         try:
             result.append(unstructurer.unstructure_as(tp, item))
@@ -119,7 +117,7 @@ def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: A
     key_type, value_type = get_args(unstructure_as)
 
     result = {}
-    exceptions = []
+    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
     for key, value in val.items():
         success = True
         try:
@@ -143,14 +141,14 @@ def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: A
     return result
 
 
-def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: List[Any]) -> IR:
+def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: List[Any]) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a list")
 
     (item_type,) = get_args(unstructure_as)
 
     result = []
-    exceptions = []
+    exceptions: List[Tuple[PathElem, UnstructuringError]] = []
     for index, item in enumerate(val):
         try:
             result.append(unstructurer.unstructure_as(item_type, item))
@@ -164,15 +162,19 @@ def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: L
 
 
 class UnstructureDataclassToDict(PredicateUnstructureHandler):
-    def __init__(self, name_converter=lambda name, _metadata: name):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
         self._name_converter = name_converter
 
-    def applies(self, unstructure_as, val):
+    def applies(self, unstructure_as: Any, val: Any) -> bool:
         return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
-    def __call__(self, unstructurer, unstructure_as, val):
+    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = {}
-        exceptions = []
+        exceptions: List[Tuple[PathElem, UnstructuringError]] = []
         for field in fields(unstructure_as):
             result_name = self._name_converter(field.name, field.metadata)
             try:
@@ -189,12 +191,12 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
 
 
 class UnstructureDataclassToList(PredicateUnstructureHandler):
-    def applies(self, unstructure_as, val):
+    def applies(self, unstructure_as: Any, val: Any) -> bool:
         return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
-    def __call__(self, unstructurer, unstructure_as, val):
+    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = []
-        exceptions = []
+        exceptions: List[Tuple[PathElem, UnstructuringError]] = []
         for field in fields(unstructure_as):
             try:
                 result.append(unstructurer.unstructure_as(field.type, getattr(val, field.name)))

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union
 
 import pytest
-from ordinatio import (
+from compages import (
     UnstructureDataclassToDict,
     UnstructureDataclassToList,
     Unstructurer,
@@ -19,7 +19,7 @@ from ordinatio import (
     unstructure_as_tuple,
     unstructure_as_union,
 )
-from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
+from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 def assert_exception_matches(exc, reference_exc):

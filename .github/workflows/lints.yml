@@ -34,4 +34,4 @@ jobs:
         pdm sync -G lint
     - name: Run mypy
       run: |
-        pdm run mypy ordinatio
+        pdm run mypy compages

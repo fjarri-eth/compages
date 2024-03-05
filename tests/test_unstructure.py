@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, NewType
 
 import pytest
-from ordinatio import (
+from compages import (
     UnstructureDataclassToDict,
     Unstructurer,
     UnstructuringError,

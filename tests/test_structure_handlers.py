@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple, Union
 
 import pytest
-from ordinatio import (
+from compages import (
     StructureDictIntoDataclass,
     StructureListIntoDataclass,
     Structurer,
@@ -19,7 +19,7 @@ from ordinatio import (
     structure_into_tuple,
     structure_into_union,
 )
-from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
+from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 
 # TODO: duplicate

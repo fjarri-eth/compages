@@ -36,7 +36,7 @@ jobs:
         pdm sync -G tests
     - name: Test with pytest
       run: |
-        pdm run py.test --cov=ordinatio --cov-report=xml tests
+        pdm run py.test --cov=compages --cov-report=xml tests
     - name: Upload coverage
       if: matrix.python-version == '3.11'
       run: |

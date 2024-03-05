@@ -21,7 +21,7 @@ import setuptools_scm
 
 # -- Project information -----------------------------------------------------
 
-project = "ordinatio"
+project = "compages"
 copyright = "2024-now, Bogdan Opanchuk"
 author = "Bogdan Opanchuk"
 

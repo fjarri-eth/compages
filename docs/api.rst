@@ -1,7 +1,7 @@
 Public API
 ==========
 
-.. automodule:: ordinatio
+.. automodule:: compages
 
 
 Converters

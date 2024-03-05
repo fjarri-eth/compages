@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List, NewType, Union
 
 import pytest
-from ordinatio import (
+from compages import (
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -14,7 +14,7 @@ from ordinatio import (
     structure_into_str,
     structure_into_union,
 )
-from ordinatio.path import DictKey, DictValue, ListElem, StructField, UnionVariant
+from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 HexInt = NewType("HexInt", int)
 

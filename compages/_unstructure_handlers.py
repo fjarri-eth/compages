@@ -1,5 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import fields, is_dataclass
+from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
 from typing import Any, get_args
@@ -172,10 +172,16 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for field in fields(unstructure_as):
             result_name = self._name_converter(field.name, field.metadata)
+            value = getattr(val, field.name)
+            # If the value field is equal to the default one, don't add it to the result.
             try:
-                result[result_name] = unstructurer.unstructure_as(
-                    field.type, getattr(val, field.name)
-                )
+                if field.default is not MISSING and value == field.default:
+                    continue
+            # On the off-chance the comparison is strict and raises an exception on type mismatch
+            except Exception:  # noqa: S110, BLE001
+                pass
+            try:
+                result[result_name] = unstructurer.unstructure_as(field.type, value)
             except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 

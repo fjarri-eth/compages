@@ -8,6 +8,7 @@ from compages import (
     UnstructureDataclassToList,
     Unstructurer,
     UnstructuringError,
+    simple_unstructure,
     unstructure_as_bool,
     unstructure_as_bytes,
     unstructure_as_dict,
@@ -233,6 +234,61 @@ def test_unstructure_dataclass_to_dict():
         [(StructField("y"), UnstructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_unstructure_dataclass_to_dict_skip_defaults():
+    # Badly behaving classes that raise an error on comparison,
+    # so the unstructurer will have to process that when we're comparing
+    # `z=A()` with the default `B()`
+
+    class A:
+        def __eq__(self, other):
+            if not isinstance(other, A):
+                raise TypeError("type mismatch")
+            return True
+
+    class B:
+        def __eq__(self, other):
+            if not isinstance(other, A):
+                raise TypeError("type mismatch")
+            return True
+
+        # Have to define this to be able to use it as a default in a dataclass
+        def __hash__(self):
+            return 1
+
+    b = B()
+
+    @dataclass
+    class Container:
+        x: int
+        y: str = "b"
+        z: A | B = b
+
+    @simple_unstructure
+    def unstructure_a(_val):
+        return "A"
+
+    @simple_unstructure
+    def unstructure_b(_val):
+        return "B"
+
+    unstructurer = Unstructurer(
+        handlers={
+            UnionType: unstructure_as_union,
+            A: unstructure_a,
+            B: unstructure_b,
+            int: unstructure_as_int,
+            str: unstructure_as_str,
+        },
+        predicate_handlers=[UnstructureDataclassToDict()],
+    )
+
+    # `y` will not be present in the results since its value is equal to the default one
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="b", z=A())) == {
+        "x": 1,
+        "z": "A",
+    }
 
 
 def test_unstructure_dataclass_to_list():

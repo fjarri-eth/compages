@@ -13,6 +13,26 @@ class UnstructuringError(Exception):
         self.message = message
         self.inner_errors = inner_errors
 
+    def __str__(self) -> str:
+        messages = collect_messages([], self)
+
+        _, msg = messages[0]
+        message_strings = [msg] + [
+            "  " * len(path) + ".".join(str(elem) for elem in path) + f": {msg}"
+            for path, msg in messages[1:]
+        ]
+
+        return "\n".join(message_strings)
+
+
+def collect_messages(
+    path: list[PathElem], exc: UnstructuringError
+) -> list[tuple[list[PathElem], str]]:
+    result = [(path, exc.message)]
+    for path_elem, inner_exc in exc.inner_errors:
+        result.extend(collect_messages([*path, path_elem], inner_exc))
+    return result
+
 
 class PredicateUnstructureHandler(ABC):
     @abstractmethod

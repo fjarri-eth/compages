@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from types import UnionType
 from typing import NewType
 
 import pytest
@@ -8,9 +9,13 @@ from compages import (
     Unstructurer,
     UnstructuringError,
     simple_unstructure,
+    unstructure_as_dict,
     unstructure_as_int,
     unstructure_as_list,
+    unstructure_as_str,
+    unstructure_as_union,
 )
+from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
 HexInt = NewType("HexInt", int)
 
@@ -81,3 +86,102 @@ def test_unstructure_routing_handler_not_found():
         unstructurer.unstructure_as(int, 1)
     expected = UnstructuringError("No handlers registered to unstructure as <class 'int'>")
     assert_exception_matches(exc.value, expected)
+
+
+def test_error_rendering():
+    @dataclass
+    class Inner:
+        u: int | str
+        d: dict[int, str]
+        lst: list[int]
+
+    @dataclass
+    class Outer:
+        x: int
+        y: Inner
+
+    unstructurer = Unstructurer(
+        handlers={
+            UnionType: unstructure_as_union,
+            list: unstructure_as_list,
+            dict: unstructure_as_dict,
+            int: unstructure_as_int,
+            str: unstructure_as_str,
+        },
+        predicate_handlers=[UnstructureDataclassToDict()],
+    )
+
+    data = Outer(x="a", y=Inner(u=1.2, d={"a": "b", 1: 2}, lst=[1, "a"]))
+    with pytest.raises(UnstructuringError) as exc:
+        unstructurer.unstructure_as(Outer, data)
+    expected = UnstructuringError(
+        "Cannot unstructure as",
+        [
+            (StructField("x"), UnstructuringError("The value must be an integer")),
+            (
+                StructField("y"),
+                UnstructuringError(
+                    "Cannot unstructure as",
+                    [
+                        (
+                            StructField("u"),
+                            UnstructuringError(
+                                r"Cannot unstructure as int | str",
+                                [
+                                    (
+                                        UnionVariant(int),
+                                        UnstructuringError("The value must be an integer"),
+                                    ),
+                                    (
+                                        UnionVariant(str),
+                                        UnstructuringError("The value must be a string"),
+                                    ),
+                                ],
+                            ),
+                        ),
+                        (
+                            StructField("d"),
+                            UnstructuringError(
+                                r"Cannot unstructure as dict\[int, str\]",
+                                [
+                                    (
+                                        DictKey("a"),
+                                        UnstructuringError("The value must be an integer"),
+                                    ),
+                                    (
+                                        DictValue(1),
+                                        UnstructuringError("The value must be a string"),
+                                    ),
+                                ],
+                            ),
+                        ),
+                        (
+                            StructField("lst"),
+                            UnstructuringError(
+                                r"Cannot unstructure as list\[int\]",
+                                [(ListElem(1), UnstructuringError("The value must be an integer"))],
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ],
+    )
+
+    assert_exception_matches(exc.value, expected)
+
+    exc_str = """
+Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Outer'>
+  x: The value must be an integer
+  y: Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Inner'>
+    y.u: Cannot unstructure as int | str
+      y.u.<int>: The value must be an integer
+      y.u.<str>: The value must be a string
+    y.d: Cannot unstructure as dict[int, str]
+      y.d.key(a): The value must be an integer
+      y.d.[1]: The value must be a string
+    y.lst: Cannot unstructure as list[int]
+      y.lst.[1]: The value must be an integer
+""".strip()
+
+    assert str(exc.value) == exc_str

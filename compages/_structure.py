@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, NewType, TypeVar, get_origin, overload
 
+from ._common import GeneratorStack
 from .path import PathElem
 
 
@@ -45,43 +46,52 @@ class Structurer:
         self._predicate_handlers = predicate_handlers
 
     @overload
-    def structure_into(self, structure_into: NewType, obj: Any) -> Any: ...
+    def structure_into(self, structure_into: NewType, val: Any) -> Any: ...
 
     @overload
-    def structure_into(self, structure_into: type[_T], obj: Any) -> _T: ...
+    def structure_into(self, structure_into: type[_T], val: Any) -> _T: ...
 
-    def structure_into(self, structure_into: Any, obj: Any) -> Any:
+    def structure_into(self, structure_into: Any, val: Any) -> Any:
+        stack = GeneratorStack((self, structure_into), val)
+
         # First check if there is an exact match registered
         handler = self._handlers.get(structure_into, None)
+        if stack.push(handler):
+            return stack.result()
 
         # If it's a newtype, try to fall back to a handler for the wrapped type
-        if handler is None and isinstance(structure_into, NewType):
+        if isinstance(structure_into, NewType):
             handler = self._handlers.get(structure_into.__supertype__, None)
+            if stack.push(handler):
+                return stack.result()
 
         # If it's a generic, see if there is a handler for the generic origin
-        if handler is None:
-            origin = get_origin(structure_into)
-            if origin is not None:
-                handler = self._handlers.get(origin, None)
+        origin = get_origin(structure_into)
+        if origin is not None:
+            handler = self._handlers.get(origin, None)
+            if stack.push(handler):
+                return stack.result()
 
         # Check all predicate handlers in order and see if there is one that applies
         # TODO (#10): should `applies()` raise an exception which we could collect
         # and attach to the error below, to provide more context on why no handlers were found?
-        if handler is None:
-            for predicate_handler in self._predicate_handlers:
-                if predicate_handler.applies(structure_into, obj):
-                    handler = predicate_handler
-                    break
+        for predicate_handler in self._predicate_handlers:
+            if predicate_handler.applies(structure_into, val):
+                if stack.push(predicate_handler):
+                    return stack.result()
+                break
 
-        if handler is None:
+        if stack.is_empty():
             raise StructuringError(f"No handlers registered to structure into {structure_into}")
 
-        return handler(self, structure_into, obj)
+        raise StructuringError(
+            f"Could not find a non-generator handler to structure into {structure_into}"
+        )
 
 
 class PredicateStructureHandler(ABC):
     @abstractmethod
-    def applies(self, structure_into: Any, obj: Any) -> bool: ...
+    def applies(self, structure_into: Any, val: Any) -> bool: ...
 
     @abstractmethod
-    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any: ...
+    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any: ...

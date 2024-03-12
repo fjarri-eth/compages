@@ -8,6 +8,7 @@ Added
 ^^^^^
 
 - Skip fields equal to the defaults when unstructuring dataclasses. (PR_13_)
+- Generator-based deferring to lower level structuring and unstructuring. (PR_13_)
 
 
 Fixed

@@ -91,7 +91,24 @@ def get_fields_dataclass(tp: ExtendedType[Any]) -> list[Field]:
     return fields
 
 
-class StructLikeOptions(NamedTuple):
+@dataclasses.dataclass
+class StructLikeOptions:
+    """Options for handlers working with struct-like types (dataclasses, named tuples etc)."""
+
     to_unstructured_name: Callable[[str, Any], str] = lambda name, _metadata: name
+    """
+    A function converting a field name of a typed representation
+    into a field name of the corresponding unstructured representation.
+
+    The second argument is the metadata attached to the field (if any).
+    """
+
     unstructure_skip_defaults: bool = True
+    """If the field value equals to the default when unstructuring, do not output it."""
+
     structure_fill_in_defaults: bool = True
+    """
+    If the field value is missing when structuring, substitute the default.
+
+    If this value is ``False``, an error will be raised instead.
+    """

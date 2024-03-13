@@ -19,11 +19,15 @@ from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVari
 
 
 class AsNone(UnstructureHandler):
+    """Unstructures ``None`` as itself."""
+
     def simple_unstructure(self, _val: None) -> None:
         pass
 
 
 class AsInt(UnstructureHandler):
+    """Unstructures anything convertable to an ``int`` (but not ``bool``) as an ``int``."""
+
     def simple_unstructure(self, val: int) -> int:
         # Handling a special case of `bool` here since in Python `bool` is an `int`,
         # and we don't want to mix them up.
@@ -33,26 +37,41 @@ class AsInt(UnstructureHandler):
 
 
 class AsFloat(UnstructureHandler):
+    """Unstructures anything convertable to a ``float`` as a ``float``."""
+
     def simple_unstructure(self, val: float) -> float:
         return float(val)
 
 
 class AsBool(UnstructureHandler):
+    """Unstructures anything convertable to a ``bool`` as a ``bool``."""
+
     def simple_unstructure(self, val: bool) -> bool:  # noqa: FBT001
         return bool(val)
 
 
 class AsBytes(UnstructureHandler):
+    """Unstructures anything convertable to ``bytes`` as ``bytes``."""
+
     def simple_unstructure(self, val: bytes) -> bytes:
         return bytes(val)
 
 
 class AsStr(UnstructureHandler):
+    """Unstructures anything convertable to a ``str`` as ``str``."""
+
     def simple_unstructure(self, val: str) -> str:
         return str(val)
 
 
 class AsUnion(UnstructureHandler):
+    """
+    Attempts to unstructure as every typr in the union in order,
+    returns the result of the first succeeded call.
+
+    If none succeeded, raises a :py:class:`UnstructuringError`.
+    """
+
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         variants = get_args(context.unstructure_as)
 
@@ -67,6 +86,8 @@ class AsUnion(UnstructureHandler):
 
 
 class AsTuple(UnstructureHandler):
+    """Unstructures as a ``tuple`` given its type arguments."""
+
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         if not isinstance(val, Sequence):
             raise UnstructuringError("Can only unstructure a Sequence as a tuple")
@@ -103,6 +124,8 @@ class AsTuple(UnstructureHandler):
 
 
 class AsDict(UnstructureHandler):
+    """Unstructures as a ``dict`` given its type arguments."""
+
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         if not isinstance(val, Mapping):
             raise UnstructuringError("Can only unstructure a Mapping as a dict")
@@ -135,6 +158,8 @@ class AsDict(UnstructureHandler):
 
 
 class AsList(UnstructureHandler):
+    """Unstructures as a ``list`` given its type arguments."""
+
     def unstructure(self, context: UnstructurerContext, val: list[Any]) -> Any:
         if not isinstance(val, Sequence):
             raise UnstructuringError("Can only unstructure a Sequence as a list")
@@ -249,6 +274,8 @@ class _AsStructLikeToList(UnstructureHandler):
 
 
 class AsDataclassToList(UnstructureHandler):
+    """Unstructures a :py:func:`~dataclasses.dataclass` instance into a ``list``."""
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()) -> None:
         self._handler = _AsStructLikeToList(get_fields_dataclass, options)
 
@@ -257,6 +284,8 @@ class AsDataclassToList(UnstructureHandler):
 
 
 class AsDataclassToDict(UnstructureHandler):
+    """Unstructures a :py:func:`~dataclasses.dataclass` instance into a ``dict``."""
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _AsStructLikeToDict(get_fields_dataclass, options)
 
@@ -265,6 +294,8 @@ class AsDataclassToDict(UnstructureHandler):
 
 
 class AsNamedTupleToList(UnstructureHandler):
+    """Unstructures a :py:class:`~typing.NamedTuple` instance into a ``list``."""
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _AsStructLikeToList(get_fields_named_tuple, options)
 
@@ -273,6 +304,8 @@ class AsNamedTupleToList(UnstructureHandler):
 
 
 class AsNamedTupleToDict(UnstructureHandler):
+    """Unstructures a :py:class:`~typing.NamedTuple` instance into a ``dict``."""
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _AsStructLikeToDict(get_fields_named_tuple, options)
 

@@ -85,12 +85,17 @@ class GeneratorStack(Generic[_ContextType, _ResultType]):
 _T_co = TypeVar("_T_co", covariant=True)
 
 
-# Unfortunately, `NewType` in Python is not generic, so we cannot express the concept of
-# "the type of instances of of this type, given the type's type annotation"
-#
-# This protocol covers any instance of `NewType` and has the same properties as `type[_T]`.
 @runtime_checkable
 class TypedNewType(Protocol, Generic[_T_co]):
+    """
+    Unfortunately, :py:class:`typing.NewType` in Python is not generic,
+    so we cannot express the concept of "the type of instances of of this type,
+    given the type's type annotation".
+
+    This protocol covers any instance of :py:class:`typing.NewType`
+    and has the same properties as ``type[_T]``.
+    """
+
     def __call__(self, value: Any) -> _T_co: ...
 
     __supertype__: "type[Any] | TypedNewType[Any]"
@@ -105,11 +110,17 @@ ExtendedType: TypeAlias = type[_T] | TypedNewType[_T]
 
 
 class DataclassBase:
-    pass
+    """
+    A marker type for built-in dataclasses (since they don't have a common base type).
+    Use to attach dataclass-related handlers (e.g. :py:class:`IntoDataclassFromMapping`).
+    """
 
 
 class NamedTupleBase:
-    pass
+    """
+    A marker type for built-in named tuples (since they don't have a common base type).
+    Use to attach NamedTuple-related handlers (e.g. :py:class:`IntoNamedTupleFromMapping`).
+    """
 
 
 def is_named_tuple(tp: ExtendedType[Any]) -> bool:
@@ -121,24 +132,24 @@ def is_named_tuple(tp: ExtendedType[Any]) -> bool:
 
 def isinstance_ext(val: Any, lookup_order: list[ExtendedType[Any]]) -> bool:
     """
-    An extended `isinstance` working with newtypes and generic types.
+    An extended :py:func:`isinstance` working with newtypes and generic types.
 
-    Instead of an actual type `tp` takes the return value of `get_lookup_order(tp)`
+    Instead of an actual type ``tp`` takes the return value of ``get_lookup_order(tp)``
     (for performance reasons).
 
-    If `tp` is a regular type, returns `isinstance(val, tp)`.
+    If ``tp`` is a regular type, returns ``isinstance(val, tp)``.
 
-    If `tp` is a `NewType`, returns `isinstance(val, base_tp)` where `base_tp`
+    If ``tp`` is a `NewType`, returns ``isinstance(val, base_tp)`` where ``base_tp``
     is the first regular supertype of the newtype hierarchy.
 
-    If `tp` is a generic, `isinstance_ext` **does not** attempt to introspect the value
+    If ``tp`` is a generic, ``isinstance_ext()`` **does not** attempt to introspect the value
     (not that it has any means to, at this level),
-    only checking for `isinstance()` with the origin.
-    That is, `isinstance_ext(val, list[int]) == isinstance(val, list)`,
+    only checking for ``isinstance()`` with the origin.
+    That is, ``isinstance_ext(val, list[int]) == isinstance(val, list)``,
     regardless of what type the elements of `val` are
     (checking that is the responsibility of handlers).
 
-    As a corollary or that, `isinstance_ext(val, UnionType[...])` is always `True`.
+    As a corollary or that, ``isinstance_ext(val, UnionType[...])`` is always ``True``.
     """
     for tp in lookup_order:
         if tp is UnionType:
@@ -162,14 +173,17 @@ def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     or newtypes.
 
     The order is the following:
+
     - For a regular type, it equals to its ``.mro()`` without the last element
       (``builtins.object``).
-    - For a ``typing.NewType`` instance, the order is the ``tp`` followed by the lookup order for
-      ``tp.__supertype__``.
+    - For a :py:class`typing.NewType` instance, the order is the ``tp``
+      followed by the lookup order for ``tp.__supertype__``.
     - For a generic (something with a non-``None`` ``typing.get_origin()``),
       the order is ``tp`` followed by the lookup order for the origin.
-    - For a dataclass, a ``DataclassBase`` marker type is appended to the end of the returned list.
-    - For a named tuple, a ``NamedTupleBase`` marker type is inserted just before ``tuple``.
+    - For a dataclass, a :py:class:`DataclassBase` marker type is appended
+      to the end of the returned list.
+    - For a named tuple, a :py:class:`NamedTupleBase` marker type
+      is inserted just before ``tuple``.
 
     .. note::
 

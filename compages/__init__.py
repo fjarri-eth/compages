@@ -1,4 +1,4 @@
-from ._common import DataclassBase, NamedTupleBase
+from ._common import DataclassBase, NamedTupleBase, TypedNewType, get_lookup_order, isinstance_ext
 from ._struct_like import StructLikeOptions
 from ._structure import (
     StructureHandler,
@@ -81,8 +81,11 @@ __all__ = [
     "Structurer",
     "StructurerContext",
     "StructuringError",
+    "TypedNewType",
     "UnstructureHandler",
     "Unstructurer",
     "UnstructurerContext",
     "UnstructuringError",
+    "get_lookup_order",
+    "isinstance_ext",
 ]

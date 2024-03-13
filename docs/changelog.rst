@@ -4,6 +4,13 @@ Changelog
 0.2.1 (2024-03-05)
 ------------------
 
+Added
+^^^^^
+
+- Skip fields equal to the defaults when unstructuring dataclasses. (PR_13_)
+- Generator-based deferring to lower level structuring and unstructuring. (PR_13_)
+
+
 Fixed
 ^^^^^
 
@@ -11,6 +18,7 @@ Fixed
 
 
 .. _PR_1: https://github.com/fjarri/compages/pull/1
+.. _PR_13: https://github.com/fjarri/compages/pull/13
 
 
 0.2.0 (2024-03-05)

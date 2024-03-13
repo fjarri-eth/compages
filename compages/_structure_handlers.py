@@ -159,22 +159,22 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
 
 
 class StructureListIntoDataclass(PredicateStructureHandler):
-    def applies(self, structure_into: Any, obj: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(obj, list)
+    def applies(self, structure_into: Any, val: Any) -> bool:
+        return is_dataclass(structure_into) and isinstance(val, list)
 
-    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
+    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 
         struct_fields = fields(structure_into)
 
-        if len(obj) > len(struct_fields):
+        if len(val) > len(struct_fields):
             raise StructuringError(f"Too many fields to serialize into {structure_into}")
 
         for i, field in enumerate(struct_fields):
-            if i < len(obj):
+            if i < len(val):
                 try:
-                    results[field.name] = structurer.structure_into(field.type, obj[i])
+                    results[field.name] = structurer.structure_into(field.type, val[i])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:
@@ -198,26 +198,26 @@ class StructureDictIntoDataclass(PredicateStructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, structure_into: Any, obj: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(obj, dict)
+    def applies(self, structure_into: Any, val: Any) -> bool:
+        return is_dataclass(structure_into) and isinstance(val, dict)
 
-    def __call__(self, structurer: Structurer, structure_into: Any, obj: Any) -> Any:
+    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
         for field in fields(structure_into):
-            obj_name = self._name_converter(field.name, field.metadata)
-            if obj_name in obj:
+            val_name = self._name_converter(field.name, field.metadata)
+            if val_name in val:
                 try:
-                    results[field.name] = structurer.structure_into(field.type, obj[obj_name])
+                    results[field.name] = structurer.structure_into(field.type, val[val_name])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:
                 results[field.name] = field.default
             else:
-                if obj_name == field.name:
+                if val_name == field.name:
                     message = "Missing field"
                 else:
-                    message = f"Missing field (`{obj_name}` in the input)"
+                    message = f"Missing field (`{val_name}` in the input)"
                 exceptions.append((StructField(field.name), StructuringError(message)))
 
         if exceptions:

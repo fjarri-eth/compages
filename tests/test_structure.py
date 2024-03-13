@@ -85,30 +85,61 @@ def test_structure_routing():
     )
 
 
+def test_structure_generators():
+    @dataclass
+    class Container:
+        x: int
+
+    @simple_structure
+    def structure_container(val):
+        to_lower_level = {"x": val["x"] + 10}
+        from_lower_level = yield to_lower_level
+        return Container(x=from_lower_level.x * 2)
+
+    structurer = Structurer(
+        handlers={
+            int: structure_into_int,
+            Container: structure_container,
+        },
+        predicate_handlers=[StructureDictIntoDataclass()],
+    )
+
+    assert structurer.structure_into(Container, {"x": 1}) == Container(x=22)
+
+
+def test_structure_no_finalizing_handler():
+    # Checks that an appropriate error is raised if all the found handlers
+    # turned out to be generators, and there was no regular function
+    # that would allow us to unroll the stack.
+
+    @dataclass
+    class Container:
+        x: int
+
+    class MyStructureDataclass:
+        def applies(self, _unstructure_as, _val):
+            return True
+
+        def __call__(self, _structurer, _structure_into, val):
+            new_val = yield val
+            return new_val
+
+    structurer = Structurer(
+        predicate_handlers=[MyStructureDataclass()],
+    )
+
+    with pytest.raises(
+        StructuringError, match="Could not find a non-generator handler to structure into"
+    ):
+        structurer.structure_into(Container, {"x": 1})
+
+
 def test_structure_routing_handler_not_found():
     structurer = Structurer()
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(int, 1)
     expected = StructuringError("No handlers registered to structure into <class 'int'>")
-    assert_exception_matches(exc.value, expected)
-
-
-def test_structure_routing_error_wrapping():
-    structurer = Structurer(
-        handlers={int: structure_into_int}, predicate_handlers=[StructureDictIntoDataclass()]
-    )
-
-    @dataclass
-    class Container:
-        x: int
-
-    with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, {"x": "a"})
-    expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
-        [(StructField("x"), StructuringError("The value must be an integer"))],
-    )
     assert_exception_matches(exc.value, expected)
 
 

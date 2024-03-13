@@ -79,6 +79,55 @@ def test_unstructure_routing():
     )
 
 
+def test_unstructure_generators():
+    @dataclass
+    class Container:
+        x: int
+
+    @simple_unstructure
+    def unstructure_container(val):
+        to_lower_level = Container(val.x + 10)
+        from_lower_level = yield to_lower_level
+        return {"x": from_lower_level["x"] * 2}
+
+    unstructurer = Unstructurer(
+        handlers={
+            int: unstructure_as_int,
+            Container: unstructure_container,
+        },
+        predicate_handlers=[UnstructureDataclassToDict()],
+    )
+
+    assert unstructurer.unstructure_as(Container, Container(x=1)) == {"x": 22}
+
+
+def test_unstructure_no_finalizing_handler():
+    # Checks that an appropriate error is raised if all the found handlers
+    # turned out to be generators, and there was no regular function
+    # that would allow us to unroll the stack.
+
+    @dataclass
+    class Container:
+        x: int
+
+    class MyUnstructureDataclass:
+        def applies(self, _unstructure_as, _val):
+            return True
+
+        def __call__(self, _unstructurer, _unstructure_as, val):
+            new_val = yield val
+            return new_val
+
+    unstructurer = Unstructurer(
+        predicate_handlers=[MyUnstructureDataclass()],
+    )
+
+    with pytest.raises(
+        UnstructuringError, match="Could not find a non-generator handler to unstructure as"
+    ):
+        unstructurer.unstructure_as(Container, Container(x=1))
+
+
 def test_unstructure_routing_handler_not_found():
     unstructurer = Unstructurer()
 

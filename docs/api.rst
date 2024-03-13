@@ -13,8 +13,8 @@ Converters
 .. autoclass:: Unstructurer
    :members:
 
-.. autoclass:: PredicateStructureHandler
+.. autoclass:: SequentialStructureHandler
    :members:
 
-.. autoclass:: PredicateUnstructureHandler
+.. autoclass:: SequentialUnstructureHandler
    :members:

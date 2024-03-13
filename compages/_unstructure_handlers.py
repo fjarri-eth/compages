@@ -4,7 +4,7 @@ from functools import wraps
 from types import MappingProxyType
 from typing import Any, get_args
 
-from ._unstructure import PredicateUnstructureHandler, Unstructurer, UnstructuringError
+from ._unstructure import SequentialUnstructureHandler, Unstructurer, UnstructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
@@ -156,7 +156,7 @@ def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: l
     return result
 
 
-class UnstructureDataclassToDict(PredicateUnstructureHandler):
+class UnstructureDataclassToDict(SequentialUnstructureHandler):
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
@@ -191,7 +191,7 @@ class UnstructureDataclassToDict(PredicateUnstructureHandler):
         return result
 
 
-class UnstructureDataclassToList(PredicateUnstructureHandler):
+class UnstructureDataclassToList(SequentialUnstructureHandler):
     def applies(self, unstructure_as: Any, val: Any) -> bool:
         return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 

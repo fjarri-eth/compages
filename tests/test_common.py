@@ -69,4 +69,4 @@ def test_lookup_order():
     assert get_lookup_order(D) == [D, C, int]
     assert get_lookup_order(E) == [E, list[D], list]
     assert get_lookup_order(int | str) == [int | str, UnionType]
-    assert get_lookup_order(Union[int, str]) == [Union[int, str], Union] # noqa: UP007
+    assert get_lookup_order(Union[int, str]) == [Union[int, str], Union]  # noqa: UP007

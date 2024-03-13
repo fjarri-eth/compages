@@ -4,6 +4,12 @@ Changelog
 0.3.0 (unreleased)
 ------------------
 
+Changed
+^^^^^^^
+
+- Renamed "handlers" and "predicate handlers" to "lookup handlers" and "sequential handlers". (PR_15_)
+
+
 Added
 ^^^^^
 

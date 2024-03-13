@@ -1,5 +1,5 @@
 from ._structure import (
-    PredicateStructureHandler,
+    SequentialStructureHandler,
     Structurer,
     StructuringError,
 )
@@ -19,7 +19,7 @@ from ._structure_handlers import (
     structure_into_union,
 )
 from ._unstructure import (
-    PredicateUnstructureHandler,
+    SequentialUnstructureHandler,
     Unstructurer,
     UnstructuringError,
 )
@@ -40,10 +40,10 @@ from ._unstructure_handlers import (
 )
 
 __all__ = [
-    "PredicateStructureHandler",
+    "SequentialStructureHandler",
     "Structurer",
     "StructuringError",
-    "PredicateUnstructureHandler",
+    "SequentialUnstructureHandler",
     "StructureDictIntoDataclass",
     "StructureListIntoDataclass",
     "simple_structure",

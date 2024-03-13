@@ -61,13 +61,13 @@ def test_unstructure_routing():
         return val
 
     unstructurer = Unstructurer(
-        handlers={
+        lookup_handlers={
             int: unstructure_as_int,
             HexInt: unstructure_as_hex_int,
             list[int]: unstructure_as_custom_generic,
             list: unstructure_as_list,
         },
-        predicate_handlers=[UnstructureDataclassToDict()],
+        sequential_handlers=[UnstructureDataclassToDict()],
     )
 
     result = unstructurer.unstructure_as(
@@ -91,11 +91,11 @@ def test_unstructure_generators():
         return {"x": from_lower_level["x"] * 2}
 
     unstructurer = Unstructurer(
-        handlers={
+        lookup_handlers={
             int: unstructure_as_int,
             Container: unstructure_container,
         },
-        predicate_handlers=[UnstructureDataclassToDict()],
+        sequential_handlers=[UnstructureDataclassToDict()],
     )
 
     assert unstructurer.unstructure_as(Container, Container(x=1)) == {"x": 22}
@@ -119,7 +119,7 @@ def test_unstructure_no_finalizing_handler():
             return new_val
 
     unstructurer = Unstructurer(
-        predicate_handlers=[MyUnstructureDataclass()],
+        sequential_handlers=[MyUnstructureDataclass()],
     )
 
     with pytest.raises(
@@ -150,14 +150,14 @@ def test_error_rendering():
         y: Inner
 
     unstructurer = Unstructurer(
-        handlers={
+        lookup_handlers={
             UnionType: unstructure_as_union,
             list: unstructure_as_list,
             dict: unstructure_as_dict,
             int: unstructure_as_int,
             str: unstructure_as_str,
         },
-        predicate_handlers=[UnstructureDataclassToDict()],
+        sequential_handlers=[UnstructureDataclassToDict()],
     )
 
     data = Outer(x="a", y=Inner(u=1.2, d={"a": "b", 1: 2}, lst=[1, "a"]))

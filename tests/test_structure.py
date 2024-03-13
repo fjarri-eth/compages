@@ -43,7 +43,7 @@ def assert_exception_matches(exc, reference_exc):
 
 
 def test_structure_routing():
-    # Test possible options for handling a given type.
+    # A smoke test for a combination of types requiring different handling.
 
     @dataclass
     class Container:
@@ -65,13 +65,13 @@ def test_structure_routing():
         return val
 
     structurer = Structurer(
-        handlers={
+        lookup_handlers={
             int: structure_into_int,
             HexInt: structure_hex_int,
             list[int]: structure_custom_generic,
             list: structure_into_list,
         },
-        predicate_handlers=[StructureDictIntoDataclass()],
+        sequential_handlers=[StructureDictIntoDataclass()],
     )
 
     result = structurer.structure_into(
@@ -97,11 +97,11 @@ def test_structure_generators():
         return Container(x=from_lower_level.x * 2)
 
     structurer = Structurer(
-        handlers={
+        lookup_handlers={
             int: structure_into_int,
             Container: structure_container,
         },
-        predicate_handlers=[StructureDictIntoDataclass()],
+        sequential_handlers=[StructureDictIntoDataclass()],
     )
 
     assert structurer.structure_into(Container, {"x": 1}) == Container(x=22)
@@ -125,7 +125,7 @@ def test_structure_no_finalizing_handler():
             return new_val
 
     structurer = Structurer(
-        predicate_handlers=[MyStructureDataclass()],
+        sequential_handlers=[MyStructureDataclass()],
     )
 
     with pytest.raises(
@@ -156,14 +156,14 @@ def test_error_rendering():
         y: Inner
 
     structurer = Structurer(
-        handlers={
+        lookup_handlers={
             UnionType: structure_into_union,
             list: structure_into_list,
             dict: structure_into_dict,
             int: structure_into_int,
             str: structure_into_str,
         },
-        predicate_handlers=[StructureDictIntoDataclass()],
+        sequential_handlers=[StructureDictIntoDataclass()],
     )
 
     data = {"x": "a", "y": {"u": 1.2, "d": {"a": "b", 1: 2}, "lst": [1, "a"]}}

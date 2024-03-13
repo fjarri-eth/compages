@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, NewType, get_origin
+from typing import Any
 
-from ._common import GeneratorStack
+from ._common import GeneratorStack, get_lookup_order
 from .path import PathElem
 
 
@@ -35,7 +35,7 @@ def collect_messages(
     return result
 
 
-class PredicateUnstructureHandler(ABC):
+class SequentialUnstructureHandler(ABC):
     @abstractmethod
     def applies(self, unstructure_as: Any, val: Any) -> bool: ...
 
@@ -46,39 +46,27 @@ class PredicateUnstructureHandler(ABC):
 class Unstructurer:
     def __init__(
         self,
-        handlers: Mapping[Any, Callable[["Unstructurer", Any, Any], Any]] = {},
-        predicate_handlers: Iterable[PredicateUnstructureHandler] = [],
+        lookup_handlers: Mapping[Any, Callable[["Unstructurer", Any, Any], Any]] = {},
+        sequential_handlers: Iterable[SequentialUnstructureHandler] = [],
     ):
-        self._handlers = dict(handlers)
-        self._predicate_handlers = list(predicate_handlers)
+        self._lookup_handlers = dict(lookup_handlers)
+        self._sequential_handlers = list(sequential_handlers)
 
     def unstructure_as(self, unstructure_as: Any, val: Any) -> Any:
         stack = GeneratorStack((self, unstructure_as), val)
+        lookup_order = get_lookup_order(unstructure_as)
 
-        # First check if there is an exact match registered
-        handler = self._handlers.get(unstructure_as, None)
-        if stack.push(handler):
-            return stack.result()
-
-        # If it's a newtype, try to fall back to a handler for the wrapped type
-        if isinstance(unstructure_as, NewType):
-            handler = self._handlers.get(unstructure_as.__supertype__, None)
+        for tp in lookup_order:
+            handler = self._lookup_handlers.get(tp, None)
             if stack.push(handler):
                 return stack.result()
 
-        # If it's a generic, see if there is a handler for the generic origin
-        origin = get_origin(unstructure_as)
-        if origin is not None:
-            handler = self._handlers.get(origin, None)
-            if stack.push(handler):
-                return stack.result()
-
-        # Check all predicate handlers in order and see if there is one that applies
+        # Check all sequential handlers in order and see if there is one that applies
         # TODO (#10): should `applies()` raise an exception which we could collect
         # and attach to the error below, to provide more context on why no handlers were found?
-        for predicate_handler in self._predicate_handlers:
-            if predicate_handler.applies(unstructure_as, val):
-                if stack.push(predicate_handler):
+        for sequential_handler in self._sequential_handlers:
+            if sequential_handler.applies(unstructure_as, val):
+                if stack.push(sequential_handler):
                     return stack.result()
                 break
 

@@ -4,7 +4,7 @@ from functools import wraps
 from types import MappingProxyType
 from typing import Any, get_args
 
-from ._structure import PredicateStructureHandler, Structurer, StructuringError
+from ._structure import SequentialStructureHandler, Structurer, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
@@ -158,7 +158,7 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
     return result
 
 
-class StructureListIntoDataclass(PredicateStructureHandler):
+class StructureListIntoDataclass(SequentialStructureHandler):
     def applies(self, structure_into: Any, val: Any) -> bool:
         return is_dataclass(structure_into) and isinstance(val, list)
 
@@ -190,7 +190,7 @@ class StructureListIntoDataclass(PredicateStructureHandler):
         return structure_into(**results)
 
 
-class StructureDictIntoDataclass(PredicateStructureHandler):
+class StructureDictIntoDataclass(SequentialStructureHandler):
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,

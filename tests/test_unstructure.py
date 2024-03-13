@@ -41,7 +41,7 @@ def unstructure_as_hex_int(val):
 
 
 def test_unstructure_routing():
-    # Test possible options for handling a given type.
+    # A smoke test for a combination of types requiring different handling.
 
     @dataclass
     class Container:

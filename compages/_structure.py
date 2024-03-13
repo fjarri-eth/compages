@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, NewType, TypeVar, get_origin, overload
+from typing import Any, NewType, TypeVar, overload
 
-from ._common import GeneratorStack
+from ._common import GeneratorStack, get_lookup_order
 from .path import PathElem
 
 
@@ -53,22 +53,10 @@ class Structurer:
 
     def structure_into(self, structure_into: Any, val: Any) -> Any:
         stack = GeneratorStack((self, structure_into), val)
+        lookup_order = get_lookup_order(structure_into)
 
-        # First check if there is an exact match registered
-        handler = self._handlers.get(structure_into, None)
-        if stack.push(handler):
-            return stack.result()
-
-        # If it's a newtype, try to fall back to a handler for the wrapped type
-        if isinstance(structure_into, NewType):
-            handler = self._handlers.get(structure_into.__supertype__, None)
-            if stack.push(handler):
-                return stack.result()
-
-        # If it's a generic, see if there is a handler for the generic origin
-        origin = get_origin(structure_into)
-        if origin is not None:
-            handler = self._handlers.get(origin, None)
+        for tp in lookup_order:
+            handler = self._handlers.get(tp, None)
             if stack.push(handler):
                 return stack.result()
 

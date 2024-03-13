@@ -1,5 +1,8 @@
+from types import UnionType
+from typing import NewType, Union
+
 import pytest
-from compages._common import GeneratorStack
+from compages._common import GeneratorStack, get_lookup_order
 
 
 def test_normal_operation():
@@ -47,3 +50,23 @@ def test_multiple_yields():
 
     with pytest.raises(RuntimeError, match="Expected only one yield in a generator"):
         stack.push(f2)
+
+
+def test_lookup_order():
+    class A:
+        pass
+
+    class B(A):
+        pass
+
+    C = NewType("C", int)
+    D = NewType("D", C)
+    E = NewType("E", list[D])
+
+    assert get_lookup_order(B) == [B, A]
+    assert get_lookup_order(list[A]) == [list[A], list]
+    assert get_lookup_order(C) == [C, int]
+    assert get_lookup_order(D) == [D, C, int]
+    assert get_lookup_order(E) == [E, list[D], list]
+    assert get_lookup_order(int | str) == [int | str, UnionType]
+    assert get_lookup_order(Union[int, str]) == [Union[int, str], Union] # noqa: UP007

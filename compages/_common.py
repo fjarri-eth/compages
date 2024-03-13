@@ -1,6 +1,6 @@
 from collections.abc import Callable, Generator
 from types import GeneratorType
-from typing import Any, ParamSpec
+from typing import Any, NewType, ParamSpec, cast, get_origin
 
 P = ParamSpec("P")
 
@@ -64,3 +64,35 @@ class GeneratorStack:
 
     def is_empty(self) -> bool:
         return not self._generators
+
+
+def get_lookup_order(tp: Any) -> list[Any]:
+    """
+    Returns the structuring/unstructuring handler lookup order for regular types, generic types,
+    or newtypes.
+
+    The order is the following:
+    - For a regular type, it equals to its ``.mro()`` without the last element
+      (``builtins.object``).
+    - For a ``typing.NewType`` instance, the order is the ``tp`` followed by the lookup order for
+      ``tp.__supertype__``.
+    - For a generic (something with a non-``None`` ``typing.get_origin()``),
+      the order is ``tp`` followed by the lookup order for the origin.
+
+    .. note::
+
+        If you want to assign a handler for generic unions, note that ``typing.Union[...]``
+        has the origin ``typing.Union``, but ``type1 | type2 | ...`` has the origin
+        ``types.UnionType``.
+    """
+    if isinstance(tp, NewType):
+        return [tp, *get_lookup_order(tp.__supertype__)]
+
+    origin = get_origin(tp)
+    if origin is not None:
+        return [tp, *get_lookup_order(origin)]
+
+    if hasattr(tp, "mro"):
+        return cast(list[Any], tp.mro()[:-1])
+
+    return [tp]

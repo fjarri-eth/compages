@@ -43,7 +43,7 @@ def assert_exception_matches(exc, reference_exc):
 
 
 def test_structure_routing():
-    # Test possible options for handling a given type.
+    # A smoke test for a combination of types requiring different handling.
 
     @dataclass
     class Container:

@@ -166,7 +166,7 @@ def test_error_rendering():
     expected = UnstructuringError(
         "Cannot unstructure as",
         [
-            (StructField("x"), UnstructuringError("The value must be an integer")),
+            (StructField("x"), UnstructuringError("The value must be of type `int`")),
             (
                 StructField("y"),
                 UnstructuringError(
@@ -179,11 +179,11 @@ def test_error_rendering():
                                 [
                                     (
                                         UnionVariant(int),
-                                        UnstructuringError("The value must be an integer"),
+                                        UnstructuringError("The value must be of type `int`"),
                                     ),
                                     (
                                         UnionVariant(str),
-                                        UnstructuringError("The value must be a string"),
+                                        UnstructuringError("The value must be of type `str`"),
                                     ),
                                 ],
                             ),
@@ -195,11 +195,11 @@ def test_error_rendering():
                                 [
                                     (
                                         DictKey("a"),
-                                        UnstructuringError("The value must be an integer"),
+                                        UnstructuringError("The value must be of type `int`"),
                                     ),
                                     (
                                         DictValue(1),
-                                        UnstructuringError("The value must be a string"),
+                                        UnstructuringError("The value must be of type `str`"),
                                     ),
                                 ],
                             ),
@@ -208,7 +208,12 @@ def test_error_rendering():
                             StructField("lst"),
                             UnstructuringError(
                                 r"Cannot unstructure as list\[int\]",
-                                [(ListElem(1), UnstructuringError("The value must be an integer"))],
+                                [
+                                    (
+                                        ListElem(1),
+                                        UnstructuringError("The value must be of type `int`"),
+                                    )
+                                ],
                             ),
                         ),
                     ],
@@ -221,16 +226,16 @@ def test_error_rendering():
 
     exc_str = """
 Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Outer'>
-  x: The value must be an integer
+  x: The value must be of type `int`
   y: Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Inner'>
     y.u: Cannot unstructure as int | str
-      y.u.<int>: The value must be an integer
-      y.u.<str>: The value must be a string
+      y.u.<int>: The value must be of type `int`
+      y.u.<str>: The value must be of type `str`
     y.d: Cannot unstructure as dict[int, str]
-      y.d.key(a): The value must be an integer
-      y.d.[1]: The value must be a string
+      y.d.key(a): The value must be of type `int`
+      y.d.[1]: The value must be of type `str`
     y.lst: Cannot unstructure as list[int]
-      y.lst.[1]: The value must be an integer
+      y.lst.[1]: The value must be of type `int`
 """.strip()
 
     assert str(exc.value) == exc_str

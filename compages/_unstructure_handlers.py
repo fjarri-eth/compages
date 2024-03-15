@@ -2,7 +2,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, get_args
+from typing import Any, NewType, get_args
 
 from ._unstructure import SequentialUnstructureHandler, Unstructurer, UnstructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
@@ -16,47 +16,58 @@ def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[Unstructurer, An
     return _wrapped
 
 
-@simple_unstructure
-def unstructure_as_none(val: Any) -> None:
-    if val is not None:
-        raise UnstructuringError("The value must be `None`")
+def simple_typechecked_unstructure(
+    func: Callable[[Any], Any],
+) -> Callable[[Unstructurer, Any, Any], Any]:
+    @wraps(func)
+    def _wrapped(_unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
+        if isinstance(unstructure_as, NewType):
+            base_type = unstructure_as.__supertype__
+            # Despite Mypy complaining, `NewType`'s `__supertype__` can indeed be another newtype,
+            # so we have to follow the chain until we reach something that's not a `NewType`.
+            while isinstance(base_type, NewType):  # type: ignore[unreachable]
+                base_type = base_type.__supertype__  # type: ignore[unreachable]
+            if not isinstance(val, base_type):
+                raise UnstructuringError(f"The value must be of type `{base_type.__name__}`")
+        elif not isinstance(val, unstructure_as):
+            raise UnstructuringError(f"The value must be of type `{unstructure_as.__name__}`")
+        return func(val)
+
+    return _wrapped
 
 
-@simple_unstructure
-def unstructure_as_int(val: Any) -> int:
+@simple_typechecked_unstructure
+def unstructure_as_none(_val: None) -> None:
+    pass
+
+
+@simple_typechecked_unstructure
+def unstructure_as_int(val: int) -> int:
     # Handling a special case of `bool` here since in Python `bool` is an `int`,
     # and we don't want to mix them up.
-    if not isinstance(val, int) or isinstance(val, bool):
-        raise UnstructuringError("The value must be an integer")
-    return val
+    if isinstance(val, bool):
+        raise UnstructuringError("The value must be of type `int`")
+    return int(val)
 
 
-@simple_unstructure
-def unstructure_as_float(val: Any) -> float:
-    if not isinstance(val, float):
-        raise UnstructuringError("The value must be a floating-point number")
+@simple_typechecked_unstructure
+def unstructure_as_float(val: float) -> float:
     return float(val)
 
 
-@simple_unstructure
-def unstructure_as_bool(val: Any) -> bool:
-    if not isinstance(val, bool):
-        raise UnstructuringError("The value must be a boolean")
-    return val
+@simple_typechecked_unstructure
+def unstructure_as_bool(val: bool) -> bool:  # noqa: FBT001
+    return bool(val)
 
 
-@simple_unstructure
-def unstructure_as_bytes(val: Any) -> bytes:
-    if not isinstance(val, bytes):
-        raise UnstructuringError("The value must be a bytestring")
-    return val
+@simple_typechecked_unstructure
+def unstructure_as_bytes(val: bytes) -> bytes:
+    return bytes(val)
 
 
-@simple_unstructure
-def unstructure_as_str(val: Any) -> str:
-    if not isinstance(val, str):
-        raise UnstructuringError("The value must be a string")
-    return val
+@simple_typechecked_unstructure
+def unstructure_as_str(val: str) -> str:
+    return str(val)
 
 
 def unstructure_as_union(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:

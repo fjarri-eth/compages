@@ -16,10 +16,12 @@ Added
 - Skip fields equal to the defaults when unstructuring dataclasses. (PR_13_)
 - Generator-based deferring to lower level structuring and unstructuring. (PR_13_)
 - Support for ``NewType`` chains. (PR_15_)
+- ``simple_typechecked_unstructure()`` decorator. (PR_17_)
 
 
 .. _PR_13: https://github.com/fjarri/compages/pull/13
 .. _PR_15: https://github.com/fjarri/compages/pull/15
+.. _PR_17: https://github.com/fjarri/compages/pull/17
 
 
 0.2.1 (2024-03-05)

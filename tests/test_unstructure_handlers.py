@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from types import UnionType
+from typing import NewType
 
 import pytest
 from compages import (
@@ -8,6 +9,7 @@ from compages import (
     UnstructureDataclassToList,
     Unstructurer,
     UnstructuringError,
+    simple_typechecked_unstructure,
     simple_unstructure,
     unstructure_as_bool,
     unstructure_as_bytes,
@@ -35,13 +37,33 @@ def assert_exception_matches(exc, reference_exc):
         assert_exception_matches(inner_exc, ref_exc)
 
 
+def test_simple_typechecked_unstructure():
+    A = NewType("A", int)
+    B = NewType("B", A)
+
+    @simple_typechecked_unstructure
+    def unstructure_int(val):
+        return val
+
+    assert unstructure_int(None, A, 1) == 1
+    assert unstructure_int(None, B, 1) == 1
+    assert unstructure_int(None, int, 1) == 1
+
+    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
+        unstructure_int(None, A, "a")
+    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
+        unstructure_int(None, B, "a")
+    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
+        unstructure_int(None, int, "a")
+
+
 def test_unstructure_as_none():
     unstructurer = Unstructurer(lookup_handlers={type(None): unstructure_as_none})
     assert unstructurer.unstructure_as(type(None), None) is None
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(type(None), 1)
-    expected = UnstructuringError("The value must be `None`")
+    expected = UnstructuringError("The value must be of type `NoneType`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -51,7 +73,7 @@ def test_unstructure_as_float():
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(float, "a")
-    expected = UnstructuringError("The value must be a floating-point number")
+    expected = UnstructuringError("The value must be of type `float`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -62,7 +84,7 @@ def test_unstructure_as_bool():
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(bool, "a")
-    expected = UnstructuringError("The value must be a boolean")
+    expected = UnstructuringError("The value must be of type `bool`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -72,7 +94,7 @@ def test_unstructure_as_str():
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(str, 1)
-    expected = UnstructuringError("The value must be a string")
+    expected = UnstructuringError("The value must be of type `str`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -82,7 +104,7 @@ def test_unstructure_as_bytes():
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(bytes, 1)
-    expected = UnstructuringError("The value must be a bytestring")
+    expected = UnstructuringError("The value must be of type `bytes`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -92,14 +114,14 @@ def test_unstructure_as_int():
 
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(int, "a")
-    expected = UnstructuringError("The value must be an integer")
+    expected = UnstructuringError("The value must be of type `int`")
     assert_exception_matches(exc.value, expected)
 
     # Specifically test that a boolean is not accepted,
     # even though it is a subclass of int in Python.
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(int, True)
-    expected = UnstructuringError("The value must be an integer")
+    expected = UnstructuringError("The value must be of type `int`")
     assert_exception_matches(exc.value, expected)
 
 
@@ -119,8 +141,8 @@ def test_unstructure_as_union():
     expected = UnstructuringError(
         r"Cannot unstructure as int | str",
         [
-            (UnionVariant(int), UnstructuringError("The value must be an integer")),
-            (UnionVariant(str), UnstructuringError("The value must be a string")),
+            (UnionVariant(int), UnstructuringError("The value must be of type `int`")),
+            (UnionVariant(str), UnstructuringError("The value must be of type `str`")),
         ],
     )
     assert_exception_matches(exc.value, expected)
@@ -159,7 +181,7 @@ def test_unstructure_as_tuple():
         unstructurer.unstructure_as(tuple[int, str], [1, 1.2])
     expected = UnstructuringError(
         r"Cannot unstructure as tuple\[int, str\]",
-        [(ListElem(1), UnstructuringError("The value must be a string"))],
+        [(ListElem(1), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -181,7 +203,7 @@ def test_unstructure_as_list():
         unstructurer.unstructure_as(list[int], [1, "a"])
     expected = UnstructuringError(
         r"Cannot unstructure as list\[int\]",
-        [(ListElem(1), UnstructuringError("The value must be an integer"))],
+        [(ListElem(1), UnstructuringError("The value must be of type `int`"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -207,7 +229,7 @@ def test_unstructure_as_dict():
         unstructurer.unstructure_as(dict[int, str], {"a": "b", 2: "c"})
     expected = UnstructuringError(
         r"Cannot unstructure as dict\[int, str\]",
-        [(DictKey("a"), UnstructuringError("The value must be an integer"))],
+        [(DictKey("a"), UnstructuringError("The value must be of type `int`"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -216,7 +238,7 @@ def test_unstructure_as_dict():
         unstructurer.unstructure_as(dict[int, str], {1: "a", 2: 3})
     expected = UnstructuringError(
         r"Cannot unstructure as dict\[int, str\]",
-        [(DictValue(2), UnstructuringError("The value must be a string"))],
+        [(DictValue(2), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -245,7 +267,7 @@ def test_unstructure_dataclass_to_dict():
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
         "Cannot unstructure as",
-        [(StructField("y"), UnstructuringError("The value must be a string"))],
+        [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
 
@@ -323,6 +345,6 @@ def test_unstructure_dataclass_to_list():
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
         "Cannot unstructure as",
-        [(StructField("y"), UnstructuringError("The value must be a string"))],
+        [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)

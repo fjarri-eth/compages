@@ -26,6 +26,7 @@ from ._unstructure import (
 from ._unstructure_handlers import (
     UnstructureDataclassToDict,
     UnstructureDataclassToList,
+    simple_typechecked_unstructure,
     simple_unstructure,
     unstructure_as_bool,
     unstructure_as_bytes,
@@ -62,6 +63,7 @@ __all__ = [
     "UnstructureDataclassToDict",
     "UnstructureDataclassToList",
     "simple_unstructure",
+    "simple_typechecked_unstructure",
     "unstructure_as_bool",
     "unstructure_as_bytes",
     "unstructure_as_dict",

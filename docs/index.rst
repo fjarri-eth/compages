@@ -1,5 +1,5 @@
-Alysis, an Ethereum testerchain
-===============================
+Compages, structuring/unstructuring library
+===========================================
 
 
 .. toctree::

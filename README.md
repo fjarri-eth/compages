@@ -14,5 +14,5 @@ For more information see [the documentation](https://compages.readthedocs.io/en/
 [pypi-license-image]: https://img.shields.io/pypi/l/compages
 [rtd-image]: https://readthedocs.org/projects/compages/badge/?version=latest
 [rtd-link]: https://compages.readthedocs.io/en/latest/
-[cov-image]: https://codecov.io/gh/fjarri/compages/branch/master/graph/badge.svg?token=RZP1LK1HB2
-[cov-link]: https://codecov.io/gh/fjarri/compages
+[cov-image]: https://codecov.io/gh/fjarri-eth/compages/branch/master/graph/badge.svg?token=RZP1LK1HB2
+[cov-link]: https://codecov.io/gh/fjarri-eth/compages

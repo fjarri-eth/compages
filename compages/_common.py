@@ -93,6 +93,6 @@ def get_lookup_order(tp: Any) -> list[Any]:
         return [tp, *get_lookup_order(origin)]
 
     if hasattr(tp, "mro"):
-        return cast(list[Any], tp.mro()[:-1])
+        return cast("list[Any]", tp.mro()[:-1])
 
     return [tp]

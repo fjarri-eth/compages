@@ -277,7 +277,7 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
     # so the unstructurer will have to process that when we're comparing
     # `z=A()` with the default `B()`
 
-    class A:
+    class A:  # noqa: PLW1641
         def __eq__(self, other):
             if not isinstance(other, A):
                 raise TypeError("type mismatch")

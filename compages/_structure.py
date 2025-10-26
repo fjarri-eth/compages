@@ -78,7 +78,9 @@ class Structurer:
                 break
 
         if stack.is_empty():
-            raise StructuringError(f"No handlers registered to structure into {structure_into}")
+            raise StructuringError(
+                f"No handlers registered to structure `{val}` into {structure_into}"
+            )
 
         raise StructuringError(
             f"Could not find a non-generator handler to structure into {structure_into}"

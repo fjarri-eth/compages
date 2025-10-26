@@ -139,7 +139,7 @@ def test_structure_routing_handler_not_found():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(int, 1)
-    expected = StructuringError("No handlers registered to structure into <class 'int'>")
+    expected = StructuringError("No handlers registered to structure `1` into <class 'int'>")
     assert_exception_matches(exc.value, expected)
 
 

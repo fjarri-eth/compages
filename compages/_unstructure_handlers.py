@@ -23,10 +23,10 @@ def simple_typechecked_unstructure(
     def _wrapped(_unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         if isinstance(unstructure_as, NewType):
             base_type = unstructure_as.__supertype__
-            # Despite Mypy complaining, `NewType`'s `__supertype__` can indeed be another newtype,
+            # `NewType`'s `__supertype__` can be another newtype,
             # so we have to follow the chain until we reach something that's not a `NewType`.
-            while isinstance(base_type, NewType):  # type: ignore[unreachable]
-                base_type = base_type.__supertype__  # type: ignore[unreachable]
+            while isinstance(base_type, NewType):
+                base_type = base_type.__supertype__
             if not isinstance(val, base_type):
                 raise UnstructuringError(f"The value must be of type `{base_type.__name__}`")
         elif not isinstance(val, unstructure_as):

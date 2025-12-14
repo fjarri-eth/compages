@@ -166,7 +166,8 @@ class StructureListIntoDataclass(SequentialStructureHandler):
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 
-        struct_fields = fields(context.structure_into)
+        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
+        struct_fields = fields(context.structure_into)  # type: ignore[arg-type]
 
         try:
             field_types = get_type_hints(context.structure_into)
@@ -217,7 +218,10 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
         except NameError as exc:
             raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        for field in fields(context.structure_into):
+        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
+        struct_fields = fields(context.structure_into)  # type: ignore[arg-type]
+
+        for field in struct_fields:
             val_name = self._name_converter(field.name, field.metadata)
             if val_name in val:
                 try:

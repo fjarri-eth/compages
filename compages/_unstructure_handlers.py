@@ -194,7 +194,10 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
         except NameError as exc:
             raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        for field in fields(context.unstructure_as):
+        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
+        struct_fields = fields(context.unstructure_as)  # type: ignore[arg-type]
+
+        for field in struct_fields:
             result_name = self._name_converter(field.name, field.metadata)
             value = getattr(val, field.name)
             # If the value field is equal to the default one, don't add it to the result.
@@ -230,7 +233,10 @@ class UnstructureDataclassToList(SequentialUnstructureHandler):
         except NameError as exc:
             raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        for field in fields(context.unstructure_as):
+        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
+        struct_fields = fields(context.unstructure_as)  # type: ignore[arg-type]
+
+        for field in struct_fields:
             try:
                 result.append(
                     context.unstructurer.unstructure_as(

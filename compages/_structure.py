@@ -1,5 +1,4 @@
-from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from typing import Any, NamedTuple, TypeVar
 
 from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
@@ -33,14 +32,6 @@ def collect_messages(
     return result
 
 
-class SequentialStructureHandler(ABC):
-    @abstractmethod
-    def applies(self, structure_into: Any, val: Any) -> bool: ...
-
-    @abstractmethod
-    def __call__(self, context: "StructurerContext", val: Any) -> Any: ...
-
-
 _T = TypeVar("_T")
 
 
@@ -52,11 +43,9 @@ class StructurerContext(NamedTuple):
 class Structurer:
     def __init__(
         self,
-        lookup_handlers: Mapping[Any, Callable[[StructurerContext, Any], Any]] = {},
-        sequential_handlers: Iterable[SequentialStructureHandler] = [],
+        handlers: Mapping[Any, Callable[[StructurerContext, Any], Any]] = {},
     ):
-        self._lookup_handlers = lookup_handlers
-        self._sequential_handlers = sequential_handlers
+        self._handlers = dict(handlers)
 
     def structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
         context = StructurerContext(structurer=self, structure_into=structure_into)
@@ -64,20 +53,10 @@ class Structurer:
         lookup_order = get_lookup_order(structure_into)
 
         for tp in lookup_order:
-            handler = self._lookup_handlers.get(tp, None)
+            handler = self._handlers.get(tp, None)
             result = stack.push(handler)
             if result is not Result.UNDEFINED:
                 return result
-
-        # Check all sequential handlers in order and see if there is one that applies
-        # TODO (#10): should `applies()` raise an exception which we could collect
-        # and attach to the error below, to provide more context on why no handlers were found?
-        for sequential_handler in self._sequential_handlers:
-            if sequential_handler.applies(structure_into, val):
-                result = stack.push(sequential_handler)
-                if result is not Result.UNDEFINED:
-                    return result
-                break
 
         if stack.is_empty():
             raise StructuringError(

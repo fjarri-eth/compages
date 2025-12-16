@@ -5,8 +5,8 @@ from typing import NewType
 
 import pytest
 from compages import (
+    Dataclass,
     UnstructureDataclassToDict,
-    UnstructureDataclassToList,
     Unstructurer,
     UnstructurerContext,
     UnstructuringError,
@@ -22,6 +22,7 @@ from compages import (
     unstructure_as_str,
     unstructure_as_tuple,
     unstructure_as_union,
+    unstructure_dataclass_to_list,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -59,7 +60,7 @@ def test_simple_typechecked_unstructure():
 
 
 def test_unstructure_as_none():
-    unstructurer = Unstructurer(lookup_handlers={type(None): unstructure_as_none})
+    unstructurer = Unstructurer({type(None): unstructure_as_none})
     assert unstructurer.unstructure_as(type(None), None) is None
 
     with pytest.raises(UnstructuringError) as exc:
@@ -69,7 +70,7 @@ def test_unstructure_as_none():
 
 
 def test_unstructure_as_float():
-    unstructurer = Unstructurer(lookup_handlers={float: unstructure_as_float})
+    unstructurer = Unstructurer({float: unstructure_as_float})
     assert unstructurer.unstructure_as(float, 1.5) == 1.5
 
     with pytest.raises(UnstructuringError) as exc:
@@ -79,7 +80,7 @@ def test_unstructure_as_float():
 
 
 def test_unstructure_as_bool():
-    unstructurer = Unstructurer(lookup_handlers={bool: unstructure_as_bool})
+    unstructurer = Unstructurer({bool: unstructure_as_bool})
     assert unstructurer.unstructure_as(bool, True) is True
     assert unstructurer.unstructure_as(bool, False) is False
 
@@ -90,7 +91,7 @@ def test_unstructure_as_bool():
 
 
 def test_unstructure_as_str():
-    unstructurer = Unstructurer(lookup_handlers={str: unstructure_as_str})
+    unstructurer = Unstructurer({str: unstructure_as_str})
     assert unstructurer.unstructure_as(str, "abc") == "abc"
 
     with pytest.raises(UnstructuringError) as exc:
@@ -100,7 +101,7 @@ def test_unstructure_as_str():
 
 
 def test_unstructure_as_bytes():
-    unstructurer = Unstructurer(lookup_handlers={bytes: unstructure_as_bytes})
+    unstructurer = Unstructurer({bytes: unstructure_as_bytes})
     assert unstructurer.unstructure_as(bytes, b"abc") == b"abc"
 
     with pytest.raises(UnstructuringError) as exc:
@@ -110,7 +111,7 @@ def test_unstructure_as_bytes():
 
 
 def test_unstructure_as_int():
-    unstructurer = Unstructurer(lookup_handlers={int: unstructure_as_int})
+    unstructurer = Unstructurer({int: unstructure_as_int})
     assert unstructurer.unstructure_as(int, 1) == 1
 
     with pytest.raises(UnstructuringError) as exc:
@@ -128,7 +129,7 @@ def test_unstructure_as_int():
 
 def test_unstructure_as_union():
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             UnionType: unstructure_as_union,
             int: unstructure_as_int,
             str: unstructure_as_str,
@@ -151,7 +152,7 @@ def test_unstructure_as_union():
 
 def test_unstructure_as_tuple():
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             tuple: unstructure_as_tuple,
             int: unstructure_as_int,
             str: unstructure_as_str,
@@ -188,9 +189,7 @@ def test_unstructure_as_tuple():
 
 
 def test_unstructure_as_list():
-    unstructurer = Unstructurer(
-        lookup_handlers={list: unstructure_as_list, int: unstructure_as_int}
-    )
+    unstructurer = Unstructurer({list: unstructure_as_list, int: unstructure_as_int})
 
     assert unstructurer.unstructure_as(list[int], [1, 2, 3]) == [1, 2, 3]
     assert unstructurer.unstructure_as(list[int], (1, 2, 3)) == [1, 2, 3]
@@ -211,7 +210,7 @@ def test_unstructure_as_list():
 
 def test_unstructure_as_dict():
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             dict: unstructure_as_dict,
             int: unstructure_as_int,
             str: unstructure_as_str,
@@ -246,10 +245,13 @@ def test_unstructure_as_dict():
 
 def test_unstructure_dataclass_to_dict():
     unstructurer = Unstructurer(
-        lookup_handlers={int: unstructure_as_int, str: unstructure_as_str},
-        sequential_handlers=[
-            UnstructureDataclassToDict(name_converter=lambda name, _metadata: name + "_")
-        ],
+        {
+            int: unstructure_as_int,
+            str: unstructure_as_str,
+            Dataclass: UnstructureDataclassToDict(
+                name_converter=lambda name, _metadata: name + "_"
+            ),
+        },
     )
 
     @dataclass
@@ -273,10 +275,23 @@ def test_unstructure_dataclass_to_dict():
     assert_exception_matches(exc.value, expected)
 
 
+def test_unstructure_dataclass_to_dict_invalid_handler():
+    unstructurer = Unstructurer(
+        {
+            int: unstructure_as_int,
+            str: UnstructureDataclassToDict(),
+        },
+    )
+
+    with pytest.raises(
+        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
+    ):
+        unstructurer.unstructure_as(str, "1")
+
+
 def test_unstructure_dataclass_to_dict_hint_resolution():
     unstructurer = Unstructurer(
-        lookup_handlers={int: unstructure_as_int},
-        sequential_handlers=[UnstructureDataclassToDict()],
+        {int: unstructure_as_int, Dataclass: UnstructureDataclassToDict()},
     )
 
     @dataclass
@@ -334,14 +349,14 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
         return "B"
 
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             UnionType: unstructure_as_union,
             A: unstructure_a,
             B: unstructure_b,
             int: unstructure_as_int,
             str: unstructure_as_str,
+            Dataclass: UnstructureDataclassToDict(),
         },
-        sequential_handlers=[UnstructureDataclassToDict()],
     )
 
     # `y` will not be present in the results since its value is equal to the default one
@@ -353,8 +368,11 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
 
 def test_unstructure_dataclass_to_list():
     unstructurer = Unstructurer(
-        lookup_handlers={int: unstructure_as_int, str: unstructure_as_str},
-        sequential_handlers=[UnstructureDataclassToList()],
+        {
+            int: unstructure_as_int,
+            str: unstructure_as_str,
+            Dataclass: unstructure_dataclass_to_list,
+        },
     )
 
     @dataclass
@@ -374,10 +392,23 @@ def test_unstructure_dataclass_to_list():
     assert_exception_matches(exc.value, expected)
 
 
+def test_unstructure_dataclass_to_list_invalid_handler():
+    unstructurer = Unstructurer(
+        {
+            int: unstructure_as_int,
+            str: unstructure_dataclass_to_list,
+        },
+    )
+
+    with pytest.raises(
+        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
+    ):
+        unstructurer.unstructure_as(str, "1")
+
+
 def test_unstructure_dataclass_to_list_hint_resolution():
     unstructurer = Unstructurer(
-        lookup_handlers={int: unstructure_as_int},
-        sequential_handlers=[UnstructureDataclassToList()],
+        {int: unstructure_as_int, Dataclass: unstructure_dataclass_to_list},
     )
 
     @dataclass

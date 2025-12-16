@@ -6,7 +6,6 @@ from typing import Any, get_args, get_type_hints
 
 from ._common import TypedNewType
 from ._unstructure import (
-    SequentialUnstructureHandler,
     UnstructurerContext,
     UnstructuringError,
 )
@@ -174,16 +173,13 @@ def unstructure_as_list(context: UnstructurerContext, val: list[Any]) -> Any:
     return result
 
 
-class UnstructureDataclassToDict(SequentialUnstructureHandler):
+class UnstructureDataclassToDict:
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
         _metadata: name,
     ):
         self._name_converter = name_converter
-
-    def applies(self, unstructure_as: type[Any], val: Any) -> bool:
-        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
     def __call__(self, context: UnstructurerContext, val: Any) -> Any:
         result = {}
@@ -194,8 +190,11 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
         except NameError as exc:
             raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
-        struct_fields = fields(context.unstructure_as)  # type: ignore[arg-type]
+        if not is_dataclass(context.unstructure_as):
+            raise UnstructuringError(
+                f"Expected a dataclass to structure into, got {context.unstructure_as}"
+            )
+        struct_fields = fields(context.unstructure_as)
 
         for field in struct_fields:
             result_name = self._name_converter(field.name, field.metadata)
@@ -220,33 +219,32 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
         return result
 
 
-class UnstructureDataclassToList(SequentialUnstructureHandler):
-    def applies(self, unstructure_as: type[Any], val: Any) -> bool:
-        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
+def unstructure_dataclass_to_list(context: UnstructurerContext, val: Any) -> Any:
+    result = []
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
-    def __call__(self, context: UnstructurerContext, val: Any) -> Any:
-        result = []
-        exceptions: list[tuple[PathElem, UnstructuringError]] = []
+    try:
+        field_types = get_type_hints(context.unstructure_as)
+    except NameError as exc:
+        raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
+    if not is_dataclass(context.unstructure_as):
+        raise UnstructuringError(
+            f"Expected a dataclass to structure into, got {context.unstructure_as}"
+        )
+    struct_fields = fields(context.unstructure_as)
+
+    for field in struct_fields:
         try:
-            field_types = get_type_hints(context.unstructure_as)
-        except NameError as exc:
-            raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
-
-        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
-        struct_fields = fields(context.unstructure_as)  # type: ignore[arg-type]
-
-        for field in struct_fields:
-            try:
-                result.append(
-                    context.unstructurer.unstructure_as(
-                        field_types[field.name], getattr(val, field.name)
-                    )
+            result.append(
+                context.unstructurer.unstructure_as(
+                    field_types[field.name], getattr(val, field.name)
                 )
-            except UnstructuringError as exc:  # noqa: PERF203
-                exceptions.append((StructField(field.name), exc))
+            )
+        except UnstructuringError as exc:  # noqa: PERF203
+            exceptions.append((StructField(field.name), exc))
 
-        if exceptions:
-            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+    if exceptions:
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
-        return result
+    return result

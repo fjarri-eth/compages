@@ -1,12 +1,11 @@
+from ._common import Dataclass
 from ._structure import (
-    SequentialStructureHandler,
     Structurer,
     StructurerContext,
     StructuringError,
 )
 from ._structure_handlers import (
     StructureDictIntoDataclass,
-    StructureListIntoDataclass,
     simple_structure,
     structure_into_bool,
     structure_into_bytes,
@@ -18,16 +17,15 @@ from ._structure_handlers import (
     structure_into_str,
     structure_into_tuple,
     structure_into_union,
+    structure_list_into_dataclass,
 )
 from ._unstructure import (
-    SequentialUnstructureHandler,
     Unstructurer,
     UnstructurerContext,
     UnstructuringError,
 )
 from ._unstructure_handlers import (
     UnstructureDataclassToDict,
-    UnstructureDataclassToList,
     simple_typechecked_unstructure,
     simple_unstructure,
     unstructure_as_bool,
@@ -40,18 +38,16 @@ from ._unstructure_handlers import (
     unstructure_as_str,
     unstructure_as_tuple,
     unstructure_as_union,
+    unstructure_dataclass_to_list,
 )
 
 __all__ = [
-    "SequentialStructureHandler",
-    "SequentialUnstructureHandler",
+    "Dataclass",
     "StructureDictIntoDataclass",
-    "StructureListIntoDataclass",
     "Structurer",
     "StructurerContext",
     "StructuringError",
     "UnstructureDataclassToDict",
-    "UnstructureDataclassToList",
     "Unstructurer",
     "UnstructurerContext",
     "UnstructuringError",
@@ -68,6 +64,7 @@ __all__ = [
     "structure_into_str",
     "structure_into_tuple",
     "structure_into_union",
+    "structure_list_into_dataclass",
     "unstructure_as_bool",
     "unstructure_as_bytes",
     "unstructure_as_dict",
@@ -78,4 +75,5 @@ __all__ = [
     "unstructure_as_str",
     "unstructure_as_tuple",
     "unstructure_as_union",
+    "unstructure_dataclass_to_list",
 ]

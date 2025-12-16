@@ -1,4 +1,5 @@
 from collections.abc import Callable, Generator
+from dataclasses import is_dataclass
 from enum import Enum
 from types import GeneratorType
 from typing import (
@@ -100,6 +101,10 @@ _T = TypeVar("_T")
 ExtendedType: TypeAlias = type[_T] | TypedNewType[_T]
 
 
+class Dataclass:
+    pass
+
+
 def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     """
     Returns the structuring/unstructuring handler lookup order for regular types, generic types,
@@ -129,6 +134,9 @@ def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     if hasattr(tp, "mro"):
         # [:-1] removes the last element of the MRO (`object`).
         mro = tp.mro()[:-1]
+
+        if is_dataclass(tp):
+            mro.append(Dataclass)
 
         # Can cast here since all the elements will be isntances of `type`.
         return cast("list[ExtendedType[Any]]", mro)

@@ -4,7 +4,7 @@ from functools import wraps
 from types import MappingProxyType
 from typing import Any, get_args, get_type_hints
 
-from ._structure import SequentialStructureHandler, StructurerContext, StructuringError
+from ._structure import StructurerContext, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
@@ -158,47 +158,49 @@ def structure_into_dict(context: StructurerContext, val: Any) -> Any:
     return result
 
 
-class StructureListIntoDataclass(SequentialStructureHandler):
-    def applies(self, structure_into: Any, val: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(val, list)
+def structure_list_into_dataclass(context: StructurerContext, val: Any) -> Any:
+    if not isinstance(val, list):
+        raise StructuringError("Can only structure a list into a dataclass")
 
-    def __call__(self, context: StructurerContext, val: Any) -> Any:
-        results = {}
-        exceptions: list[tuple[PathElem, StructuringError]] = []
+    results = {}
+    exceptions: list[tuple[PathElem, StructuringError]] = []
 
-        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
-        struct_fields = fields(context.structure_into)  # type: ignore[arg-type]
+    if not is_dataclass(context.structure_into):
+        raise StructuringError(
+            f"Expected a dataclass to structure into, got {context.structure_into}"
+        )
+    struct_fields = fields(context.structure_into)
 
-        try:
-            field_types = get_type_hints(context.structure_into)
-        except NameError as exc:
-            raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+    try:
+        field_types = get_type_hints(context.structure_into)
+    except NameError as exc:
+        raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        if len(val) > len(struct_fields):
-            raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
+    if len(val) > len(struct_fields):
+        raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
 
-        for i, field in enumerate(struct_fields):
-            if i < len(val):
-                try:
-                    results[field.name] = context.structurer.structure_into(
-                        field_types[field.name], val[i]
-                    )
-                except StructuringError as exc:
-                    exceptions.append((StructField(field.name), exc))
-            elif field.default is not MISSING:
-                results[field.name] = field.default
-            else:
-                exceptions.append((StructField(field.name), StructuringError("Missing field")))
+    for i, field in enumerate(struct_fields):
+        if i < len(val):
+            try:
+                results[field.name] = context.structurer.structure_into(
+                    field_types[field.name], val[i]
+                )
+            except StructuringError as exc:
+                exceptions.append((StructField(field.name), exc))
+        elif field.default is not MISSING:
+            results[field.name] = field.default
+        else:
+            exceptions.append((StructField(field.name), StructuringError("Missing field")))
 
-        if exceptions:
-            raise StructuringError(
-                f"Cannot structure a list into a dataclass {context.structure_into}", exceptions
-            )
+    if exceptions:
+        raise StructuringError(
+            f"Cannot structure a list into a dataclass {context.structure_into}", exceptions
+        )
 
-        return context.structure_into(**results)
+    return context.structure_into(**results)
 
 
-class StructureDictIntoDataclass(SequentialStructureHandler):
+class StructureDictIntoDataclass:
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
@@ -206,10 +208,10 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, structure_into: type[Any], val: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(val, dict)
-
     def __call__(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, dict):
+            raise StructuringError("Can only structure a dictionary into a dataclass")
+
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 
@@ -218,8 +220,11 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
         except NameError as exc:
             raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        # Checked by `applies()`, `context.structure_into` is guaranteed to be a dataclass type
-        struct_fields = fields(context.structure_into)  # type: ignore[arg-type]
+        if not is_dataclass(context.structure_into):
+            raise StructuringError(
+                f"Expected a dataclass to structure into, got {context.structure_into}"
+            )
+        struct_fields = fields(context.structure_into)
 
         for field in struct_fields:
             val_name = self._name_converter(field.name, field.metadata)

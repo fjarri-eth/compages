@@ -9,6 +9,7 @@ Changed
 
 - Handlers now take a single context argument (``StructurerContext`` or ``UnstructurerContext``) which contain the structurer and the target type. (PR_20_)
 - Support any ``Sequence`` type instead of just a list when structuring into a struct-like. Consequently, the handlers had ``list`` changed to ``sequence``. (PR_22_)
+- Support any ``Mapping`` type or ``MappingProxyType`` instead of just a dict when structuring into a struct-like. Consequently, the handlers had ``Dict`` changed to ``Mapping``. (PR_22_)
 
 
 Added

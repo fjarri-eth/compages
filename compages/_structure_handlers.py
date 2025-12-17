@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import partial, wraps
 from types import MappingProxyType
 from typing import Any, get_args
@@ -210,7 +210,7 @@ class _StructureSequenceIntoStructLike:
         return context.structure_into(**results)
 
 
-class _StructureDictIntoStructLike:
+class _StructureMappingIntoStructLike:
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
@@ -221,8 +221,8 @@ class _StructureDictIntoStructLike:
         self._name_converter = name_converter
 
     def __call__(self, context: StructurerContext, val: Any) -> Any:
-        if not isinstance(val, dict):
-            raise StructuringError(f"Can only structure a dictionary into {context.structure_into}")
+        if not isinstance(val, Mapping | MappingProxyType):
+            raise StructuringError(f"Can only structure a mapping into {context.structure_into}")
 
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
@@ -263,7 +263,7 @@ class _StructureDictIntoStructLike:
 
 
 structure_sequence_into_dataclass = _StructureSequenceIntoStructLike(get_fields_dataclass)
-StructureDictIntoDataclass = partial(_StructureDictIntoStructLike, get_fields_dataclass)
+StructureMappingIntoDataclass = partial(_StructureMappingIntoStructLike, get_fields_dataclass)
 
 structure_sequence_into_named_tuple = _StructureSequenceIntoStructLike(get_fields_named_tuple)
-StructureDictIntoNamedTuple = partial(_StructureDictIntoStructLike, get_fields_named_tuple)
+StructureMappingIntoNamedTuple = partial(_StructureMappingIntoStructLike, get_fields_named_tuple)

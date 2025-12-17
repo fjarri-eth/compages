@@ -5,8 +5,8 @@ from ._structure import (
     StructuringError,
 )
 from ._structure_handlers import (
-    StructureDictIntoDataclass,
-    StructureDictIntoNamedTuple,
+    StructureMappingIntoDataclass,
+    StructureMappingIntoNamedTuple,
     simple_structure,
     structure_into_bool,
     structure_into_bytes,
@@ -48,8 +48,8 @@ from ._unstructure_handlers import (
 __all__ = [
     "DataclassBase",
     "NamedTupleBase",
-    "StructureDictIntoDataclass",
-    "StructureDictIntoNamedTuple",
+    "StructureMappingIntoDataclass",
+    "StructureMappingIntoNamedTuple",
     "Structurer",
     "StructurerContext",
     "StructuringError",

@@ -5,7 +5,7 @@ from types import UnionType
 import pytest
 from compages import (
     DataclassBase,
-    StructureDictIntoDataclass,
+    StructureMappingIntoDataclass,
     Structurer,
     StructuringError,
     structure_into_bool,
@@ -294,7 +294,7 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            DataclassBase: StructureDictIntoDataclass(
+            DataclassBase: StructureMappingIntoDataclass(
                 name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
             ),
         },
@@ -317,7 +317,7 @@ def test_structure_dict_into_dataclass():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b"])
-    expected = StructuringError("Can only structure a dictionary into")
+    expected = StructuringError("Can only structure a mapping into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -341,7 +341,7 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            DataclassBase: StructureDictIntoDataclass(),
+            DataclassBase: StructureMappingIntoDataclass(),
         },
     )
     with pytest.raises(StructuringError) as exc:
@@ -357,7 +357,7 @@ def test_structure_dict_into_dataclass_invalid_handler():
     structurer = Structurer(
         {
             int: structure_into_int,
-            str: StructureDictIntoDataclass(),
+            str: StructureMappingIntoDataclass(),
         },
     )
 

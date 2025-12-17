@@ -14,6 +14,7 @@ Added
 ^^^^^
 
 - Support for default factory in dataclasses. (PR_21_)
+- Support for ``NamedTuple`` types. (PR_21_)
 
 
 Fixed

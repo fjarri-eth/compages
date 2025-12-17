@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, NewType, TypeVar, overload
+from typing import Any, TypeVar
 
-from ._common import GeneratorStack, get_lookup_order
+from ._common import GeneratorStack, Result, get_lookup_order
 from .path import PathElem
 
 
@@ -53,28 +53,24 @@ class Structurer:
         self._lookup_handlers = lookup_handlers
         self._sequential_handlers = sequential_handlers
 
-    @overload
-    def structure_into(self, structure_into: NewType, val: Any) -> Any: ...
-
-    @overload
-    def structure_into(self, structure_into: type[_T], val: Any) -> _T: ...
-
-    def structure_into(self, structure_into: Any, val: Any) -> Any:
-        stack = GeneratorStack((self, structure_into), val)
+    def structure_into(self, structure_into: type[_T] | Callable[[Any], _T], val: Any) -> _T:
+        stack = GeneratorStack[_T]((self, structure_into), val)
         lookup_order = get_lookup_order(structure_into)
 
         for tp in lookup_order:
             handler = self._lookup_handlers.get(tp, None)
-            if stack.push(handler):
-                return stack.result()
+            result = stack.push(handler)
+            if result is not Result.UNDEFINED:
+                return result
 
         # Check all sequential handlers in order and see if there is one that applies
         # TODO (#10): should `applies()` raise an exception which we could collect
         # and attach to the error below, to provide more context on why no handlers were found?
         for sequential_handler in self._sequential_handlers:
             if sequential_handler.applies(structure_into, val):
-                if stack.push(sequential_handler):
-                    return stack.result()
+                result = stack.push(sequential_handler)
+                if result is not Result.UNDEFINED:
+                    return result
                 break
 
         if stack.is_empty():

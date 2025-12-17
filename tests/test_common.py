@@ -2,7 +2,7 @@ from types import UnionType
 from typing import NewType, Union
 
 import pytest
-from compages._common import GeneratorStack, get_lookup_order
+from compages._common import GeneratorStack, Result, get_lookup_order
 
 
 def test_normal_operation():
@@ -12,7 +12,7 @@ def test_normal_operation():
     assert stack.is_empty()
 
     # `None` is just ignored, and stack is not finalized
-    assert not stack.push(None)
+    assert stack.push(None) is Result.UNDEFINED
 
     def f1(arg1, arg2, val):
         assert (arg1, arg2) == args
@@ -20,15 +20,14 @@ def test_normal_operation():
         return [*new_val, "c"]
 
     # We pushed a generator, so the stack is not finalized yet
-    assert not stack.push(f1)
+    assert stack.push(f1) is Result.UNDEFINED
 
     def f2(arg1, arg2, val):
         assert (arg1, arg2) == args
         return [*val, "d"]
 
     # This is a normal function, so the stack is finalized and unrolled
-    assert stack.push(f2)
-    assert stack.result() == ["a", "b", "d", "c"]
+    assert stack.push(f2) == ["a", "b", "d", "c"]
 
 
 def test_multiple_yields():

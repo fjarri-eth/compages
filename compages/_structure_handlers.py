@@ -162,7 +162,7 @@ class StructureListIntoDataclass(SequentialStructureHandler):
     def applies(self, structure_into: Any, val: Any) -> bool:
         return is_dataclass(structure_into) and isinstance(val, list)
 
-    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
+    def __call__(self, structurer: Structurer, structure_into: type[Any], val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 
@@ -203,10 +203,10 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, structure_into: Any, val: Any) -> bool:
+    def applies(self, structure_into: type[Any], val: Any) -> bool:
         return is_dataclass(structure_into) and isinstance(val, dict)
 
-    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
+    def __call__(self, structurer: Structurer, structure_into: type[Any], val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 

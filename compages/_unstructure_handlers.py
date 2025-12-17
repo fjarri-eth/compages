@@ -175,10 +175,10 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, unstructure_as: Any, val: Any) -> bool:
+    def applies(self, unstructure_as: type[Any], val: Any) -> bool:
         return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
-    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
+    def __call__(self, unstructurer: Unstructurer, unstructure_as: type[Any], val: Any) -> Any:
         result = {}
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
@@ -209,10 +209,10 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
 
 
 class UnstructureDataclassToList(SequentialUnstructureHandler):
-    def applies(self, unstructure_as: Any, val: Any) -> bool:
+    def applies(self, unstructure_as: type[Any], val: Any) -> bool:
         return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
 
-    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
+    def __call__(self, unstructurer: Unstructurer, unstructure_as: type[Any], val: Any) -> Any:
         result = []
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
 

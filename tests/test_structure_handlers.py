@@ -4,7 +4,7 @@ from types import UnionType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -229,7 +229,7 @@ def test_structure_list_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: structure_list_into_dataclass,
+            DataclassBase: structure_list_into_dataclass,
         },
     )
 
@@ -294,7 +294,7 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: StructureDictIntoDataclass(
+            DataclassBase: StructureDictIntoDataclass(
                 name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
             ),
         },
@@ -338,7 +338,11 @@ def test_structure_dict_into_dataclass():
 
     # Need a structurer without a name converter for this one
     structurer = Structurer(
-        {int: structure_into_int, str: structure_into_str, Dataclass: StructureDictIntoDataclass()},
+        {
+            int: structure_into_int,
+            str: structure_into_str,
+            DataclassBase: StructureDictIntoDataclass(),
+        },
     )
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "z": "b"})

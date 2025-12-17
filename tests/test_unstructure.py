@@ -5,7 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     UnstructureDataclassToDict,
     Unstructurer,
     UnstructuringError,
@@ -67,7 +67,7 @@ def test_unstructure_routing():
             HexInt: unstructure_as_hex_int,
             list[int]: unstructure_as_custom_generic,
             list: unstructure_as_list,
-            Dataclass: UnstructureDataclassToDict(),
+            DataclassBase: UnstructureDataclassToDict(),
         }
     )
 
@@ -95,7 +95,7 @@ def test_unstructure_generators():
         {
             int: unstructure_as_int,
             Container: unstructure_container,
-            Dataclass: UnstructureDataclassToDict(),
+            DataclassBase: UnstructureDataclassToDict(),
         }
     )
 
@@ -115,7 +115,7 @@ def test_unstructure_no_finalizing_handler():
         new_val = yield val
         return new_val
 
-    unstructurer = Unstructurer({Dataclass: my_unstructure_dataclass})
+    unstructurer = Unstructurer({DataclassBase: my_unstructure_dataclass})
 
     with pytest.raises(
         UnstructuringError, match="Could not find a non-generator handler to unstructure as"
@@ -151,7 +151,7 @@ def test_error_rendering():
             dict: unstructure_as_dict,
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: UnstructureDataclassToDict(),
+            DataclassBase: UnstructureDataclassToDict(),
         }
     )
 

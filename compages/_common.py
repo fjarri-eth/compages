@@ -101,7 +101,7 @@ _T = TypeVar("_T")
 ExtendedType: TypeAlias = type[_T] | TypedNewType[_T]
 
 
-class Dataclass:
+class DataclassBase:
     pass
 
 
@@ -147,7 +147,7 @@ def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
         mro = tp.mro()[:-1]
 
         if is_dataclass(tp):
-            mro.append(Dataclass)
+            mro.append(DataclassBase)
 
         if is_named_tuple(tp):
             # Add the marker in front of `tuple` (which will be present in the MRO),

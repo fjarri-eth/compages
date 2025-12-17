@@ -5,7 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     UnstructureDataclassToDict,
     Unstructurer,
     UnstructurerContext,
@@ -248,7 +248,7 @@ def test_unstructure_dataclass_to_dict():
         {
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: UnstructureDataclassToDict(
+            DataclassBase: UnstructureDataclassToDict(
                 name_converter=lambda name, _metadata: name + "_"
             ),
         },
@@ -335,7 +335,7 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
             B: unstructure_b,
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: UnstructureDataclassToDict(),
+            DataclassBase: UnstructureDataclassToDict(),
         },
     )
 
@@ -351,7 +351,7 @@ def test_unstructure_dataclass_to_list():
         {
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: unstructure_dataclass_to_list,
+            DataclassBase: unstructure_dataclass_to_list,
         },
     )
 

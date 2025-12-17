@@ -5,7 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -71,7 +71,7 @@ def test_structure_routing():
             HexInt: structure_hex_int,
             list[int]: structure_custom_generic,
             list: structure_into_list,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 
@@ -101,7 +101,7 @@ def test_structure_generators():
         {
             int: structure_into_int,
             Container: structure_container,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 
@@ -121,7 +121,7 @@ def test_structure_no_finalizing_handler():
         new_val = yield val
         return new_val
 
-    structurer = Structurer({Dataclass: my_structure_dataclass})
+    structurer = Structurer({DataclassBase: my_structure_dataclass})
 
     with pytest.raises(
         StructuringError, match="Could not find a non-generator handler to structure into"
@@ -157,7 +157,7 @@ def test_error_rendering():
             dict: structure_into_dict,
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 

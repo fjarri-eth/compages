@@ -4,7 +4,7 @@ from types import UnionType
 from typing import NamedTuple, NewType, Union
 
 import pytest
-from compages._common import Dataclass, GeneratorStack, NamedTupleBase, Result, get_lookup_order
+from compages._common import DataclassBase, GeneratorStack, NamedTupleBase, Result, get_lookup_order
 
 
 def test_normal_operation():
@@ -76,7 +76,7 @@ def test_lookup_order():
     class DataclassContainer:
         x: int
 
-    assert get_lookup_order(DataclassContainer) == [DataclassContainer, Dataclass]
+    assert get_lookup_order(DataclassContainer) == [DataclassContainer, DataclassBase]
 
     class NamedTupleContainer(NamedTuple):
         x: int

@@ -1,6 +1,5 @@
 import dataclasses
 from collections.abc import Callable
-from types import MappingProxyType
 from typing import Any, NamedTuple, get_type_hints
 
 from ._common import ExtendedType, is_named_tuple
@@ -19,7 +18,7 @@ class Field(NamedTuple):
     type: type[Any]
     default: Any = NoDefault
     default_factory: None | Callable[[], Any] = None
-    metadata: MappingProxyType[Any, Any] = MappingProxyType({})
+    metadata: Any = None
 
 
 def get_fields_named_tuple(tp: ExtendedType[Any]) -> list[Field]:
@@ -37,15 +36,12 @@ def get_fields_named_tuple(tp: ExtendedType[Any]) -> list[Field]:
     field_names = tp._fields  # type: ignore[union-attr]
 
     fields = []
-    metadata: MappingProxyType[Any, Any] = MappingProxyType({})
     for field_name in field_names:
         fields.append(
             Field(
                 name=field_name,
                 type=field_types[field_name],
                 default=defaults.get(field_name, NoDefault),
-                metadata=metadata,
-                default_factory=None,
             )
         )
 

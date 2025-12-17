@@ -61,8 +61,8 @@ def test_get_fields_dataclass():
     assert fields == [
         Field(name="w", type=str, metadata=metadata),
         Field(name="x", type=int, metadata={}),
-        Field(name="y", type=str, default="foo"),
-        Field(name="z", type=str, default_factory=factory),
+        Field(name="y", type=str, default="foo", metadata={}),
+        Field(name="z", type=str, default_factory=factory, metadata={}),
     ]
 
 
@@ -73,7 +73,7 @@ def test_get_fields_dataclass_hint_resolution():
 
     fields = get_fields_dataclass(Container)
 
-    assert fields == [Field(name="x", type=int)]
+    assert fields == [Field(name="x", type=int, metadata={})]
 
     @dataclass
     class Container2:

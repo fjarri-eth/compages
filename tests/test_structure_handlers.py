@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import UnionType
 
 import pytest
@@ -238,9 +238,13 @@ def test_structure_list_into_dataclass():
         x: int
         y: str
         z: str = "default"
+        w: str = field(default_factory=lambda: "other default")
 
-    assert structurer.structure_into(Container, [1, "a"]) == Container(x=1, y="a", z="default")
+    assert structurer.structure_into(Container, [1, "a"]) == Container(x=1, y="a")
     assert structurer.structure_into(Container, [1, "a", "b"]) == Container(x=1, y="a", z="b")
+    assert structurer.structure_into(Container, [1, "a", "b", "c"]) == Container(
+        x=1, y="a", z="b", w="c"
+    )
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "y": "a", "z": "b"})
@@ -248,7 +252,7 @@ def test_structure_list_into_dataclass():
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, [1, "a", "b", 2])
+        structurer.structure_into(Container, [1, "a", "b", 2, 3])
     expected = StructuringError("Too many fields to serialize into")
     assert_exception_matches(exc.value, expected)
 
@@ -291,7 +295,7 @@ def test_structure_dict_into_dataclass():
             int: structure_into_int,
             str: structure_into_str,
             Dataclass: StructureDictIntoDataclass(
-                name_converter=lambda name, _metadata: name + "_"
+                name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
             ),
         },
     )
@@ -299,15 +303,17 @@ def test_structure_dict_into_dataclass():
     @dataclass
     class Container:
         x: int
-        y: str
+        y: str = field(metadata={"foo": True})
         z: str = "default"
+        w: str = field(default_factory=lambda: "other default")
 
-    assert structurer.structure_into(Container, {"x_": 1, "y_": "a"}) == Container(
-        x=1, y="a", z="default"
-    )
-    assert structurer.structure_into(Container, {"x_": 1, "y_": "a", "z_": "b"}) == Container(
+    assert structurer.structure_into(Container, {"x_": 1, "y": "a"}) == Container(x=1, y="a")
+    assert structurer.structure_into(Container, {"x_": 1, "y": "a", "z_": "b"}) == Container(
         x=1, y="a", z="b"
     )
+    assert structurer.structure_into(
+        Container, {"x_": 1, "y": "a", "z_": "b", "w_": "c"}
+    ) == Container(x=1, y="a", z="b", w="c")
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b"])
@@ -315,15 +321,15 @@ def test_structure_dict_into_dataclass():
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, {"x_": 1, "z_": "b"})
+        structurer.structure_into(Container, {"y": "a", "z_": "b"})
     expected = StructuringError(
         "Failed to structure a dict into",
-        [(StructField("y"), StructuringError(r"Missing field \(`y_` in the input\)"))],
+        [(StructField("x"), StructuringError(r"Missing field \(`x_` in the input\)"))],
     )
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, {"x_": 1, "y_": 2, "z_": "b"})
+        structurer.structure_into(Container, {"x_": 1, "y": 2, "z_": "b"})
     expected = StructuringError(
         "Failed to structure a dict into",
         [(StructField("y"), StructuringError("The value must be a string"))],

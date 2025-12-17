@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import UnionType
 from typing import NewType
 
@@ -318,6 +318,7 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
         x: int
         y: str = "b"
         z: A | B = b
+        w: str = field(default_factory=lambda: "c")
 
     @simple_unstructure
     def unstructure_a(_val):
@@ -339,7 +340,7 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
     )
 
     # `y` will not be present in the results since its value is equal to the default one
-    assert unstructurer.unstructure_as(Container, Container(x=1, y="b", z=A())) == {
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="b", z=A(), w="c")) == {
         "x": 1,
         "z": "A",
     }

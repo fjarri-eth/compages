@@ -205,7 +205,9 @@ class _UnstructureStructLikeToDict:
             value = getattr(val, field.name)
             # If the value field is equal to the default one, don't add it to the result.
             try:
-                if field.default is not NoDefault and value == field.default:
+                if (field.default is not NoDefault and value == field.default) or (
+                    field.default_factory is not None and value == field.default_factory()
+                ):
                     continue
             # On the off-chance the comparison is strict and raises an exception on type mismatch
             except Exception:  # noqa: S110, BLE001

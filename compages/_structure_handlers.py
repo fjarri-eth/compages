@@ -197,6 +197,8 @@ class _StructureListIntoStructLike:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not NoDefault:
                 results[field.name] = field.default
+            elif field.default_factory is not None:
+                results[field.name] = field.default_factory()
             else:
                 exceptions.append((StructField(field.name), StructuringError("Missing field")))
 
@@ -243,7 +245,8 @@ class _StructureDictIntoStructLike:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not NoDefault:
                 results[field.name] = field.default
-            # TODO: support default factory
+            elif field.default_factory is not None:
+                results[field.name] = field.default_factory()
             else:
                 if val_name == field.name:
                     message = "Missing field"

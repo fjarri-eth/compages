@@ -5,7 +5,7 @@ from types import UnionType
 import pytest
 from compages import (
     DataclassBase,
-    StructureDictIntoDataclass,
+    StructureMappingIntoDataclass,
     Structurer,
     StructuringError,
     structure_into_bool,
@@ -18,7 +18,7 @@ from compages import (
     structure_into_str,
     structure_into_tuple,
     structure_into_union,
-    structure_list_into_dataclass,
+    structure_sequence_into_dataclass,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -224,12 +224,12 @@ def test_structure_into_dict():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_list_into_dataclass():
+def test_structure_sequence_into_dataclass():
     structurer = Structurer(
         {
             int: structure_into_int,
             str: structure_into_str,
-            DataclassBase: structure_list_into_dataclass,
+            DataclassBase: structure_sequence_into_dataclass,
         },
     )
 
@@ -248,7 +248,7 @@ def test_structure_list_into_dataclass():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "y": "a", "z": "b"})
-    expected = StructuringError("Can only structure a list into")
+    expected = StructuringError("Can only structure a `Sequence` into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -273,11 +273,11 @@ def test_structure_list_into_dataclass():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_list_into_dataclass_invalid_handler():
+def test_structure_sequence_into_dataclass_invalid_handler():
     structurer = Structurer(
         {
             int: structure_into_int,
-            str: structure_list_into_dataclass,
+            str: structure_sequence_into_dataclass,
         },
     )
 
@@ -294,7 +294,7 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            DataclassBase: StructureDictIntoDataclass(
+            DataclassBase: StructureMappingIntoDataclass(
                 name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
             ),
         },
@@ -317,7 +317,7 @@ def test_structure_dict_into_dataclass():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b"])
-    expected = StructuringError("Can only structure a dictionary into")
+    expected = StructuringError("Can only structure a mapping into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -341,7 +341,7 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            DataclassBase: StructureDictIntoDataclass(),
+            DataclassBase: StructureMappingIntoDataclass(),
         },
     )
     with pytest.raises(StructuringError) as exc:
@@ -357,7 +357,7 @@ def test_structure_dict_into_dataclass_invalid_handler():
     structurer = Structurer(
         {
             int: structure_into_int,
-            str: StructureDictIntoDataclass(),
+            str: StructureMappingIntoDataclass(),
         },
     )
 

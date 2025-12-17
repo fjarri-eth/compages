@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Mapping
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Any, NamedTuple, TypeVar
 
-from ._common import GeneratorStack, get_lookup_order
+from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
 from .path import PathElem
 
 
@@ -35,40 +34,31 @@ def collect_messages(
     return result
 
 
-class SequentialUnstructureHandler(ABC):
-    @abstractmethod
-    def applies(self, unstructure_as: Any, val: Any) -> bool: ...
+_T = TypeVar("_T")
 
-    @abstractmethod
-    def __call__(self, unstructurer: "Unstructurer", unstructure_as: Any, val: Any) -> Any: ...
+
+class UnstructurerContext(NamedTuple):
+    unstructurer: "Unstructurer"
+    unstructure_as: ExtendedType[Any]
 
 
 class Unstructurer:
     def __init__(
         self,
-        lookup_handlers: Mapping[Any, Callable[["Unstructurer", Any, Any], Any]] = {},
-        sequential_handlers: Iterable[SequentialUnstructureHandler] = [],
+        handlers: Mapping[Any, Callable[[UnstructurerContext, Any], Any]] = {},
     ):
-        self._lookup_handlers = dict(lookup_handlers)
-        self._sequential_handlers = list(sequential_handlers)
+        self._handlers = dict(handlers)
 
-    def unstructure_as(self, unstructure_as: Any, val: Any) -> Any:
-        stack = GeneratorStack((self, unstructure_as), val)
+    def unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+        context = UnstructurerContext(unstructurer=self, unstructure_as=unstructure_as)
+        stack = GeneratorStack[UnstructurerContext, Any](context, val)
         lookup_order = get_lookup_order(unstructure_as)
 
         for tp in lookup_order:
-            handler = self._lookup_handlers.get(tp, None)
-            if stack.push(handler):
-                return stack.result()
-
-        # Check all sequential handlers in order and see if there is one that applies
-        # TODO (#10): should `applies()` raise an exception which we could collect
-        # and attach to the error below, to provide more context on why no handlers were found?
-        for sequential_handler in self._sequential_handlers:
-            if sequential_handler.applies(unstructure_as, val):
-                if stack.push(sequential_handler):
-                    return stack.result()
-                break
+            handler = self._handlers.get(tp, None)
+            result = stack.push(handler)
+            if result is not Result.UNDEFINED:
+                return result
 
         if stack.is_empty():
             raise UnstructuringError(f"No handlers registered to unstructure as {unstructure_as}")

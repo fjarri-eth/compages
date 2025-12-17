@@ -5,6 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
+    Dataclass,
     UnstructureDataclassToDict,
     Unstructurer,
     UnstructuringError,
@@ -61,13 +62,13 @@ def test_unstructure_routing():
         return val
 
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             int: unstructure_as_int,
             HexInt: unstructure_as_hex_int,
             list[int]: unstructure_as_custom_generic,
             list: unstructure_as_list,
-        },
-        sequential_handlers=[UnstructureDataclassToDict()],
+            Dataclass: UnstructureDataclassToDict(),
+        }
     )
 
     result = unstructurer.unstructure_as(
@@ -91,11 +92,11 @@ def test_unstructure_generators():
         return {"x": from_lower_level["x"] * 2}
 
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             int: unstructure_as_int,
             Container: unstructure_container,
-        },
-        sequential_handlers=[UnstructureDataclassToDict()],
+            Dataclass: UnstructureDataclassToDict(),
+        }
     )
 
     assert unstructurer.unstructure_as(Container, Container(x=1)) == {"x": 22}
@@ -110,17 +111,11 @@ def test_unstructure_no_finalizing_handler():
     class Container:
         x: int
 
-    class MyUnstructureDataclass:
-        def applies(self, _unstructure_as, _val):
-            return True
+    def my_unstructure_dataclass(_context, val):
+        new_val = yield val
+        return new_val
 
-        def __call__(self, _unstructurer, _unstructure_as, val):
-            new_val = yield val
-            return new_val
-
-    unstructurer = Unstructurer(
-        sequential_handlers=[MyUnstructureDataclass()],
-    )
+    unstructurer = Unstructurer({Dataclass: my_unstructure_dataclass})
 
     with pytest.raises(
         UnstructuringError, match="Could not find a non-generator handler to unstructure as"
@@ -150,14 +145,14 @@ def test_error_rendering():
         y: Inner
 
     unstructurer = Unstructurer(
-        lookup_handlers={
+        {
             UnionType: unstructure_as_union,
             list: unstructure_as_list,
             dict: unstructure_as_dict,
             int: unstructure_as_int,
             str: unstructure_as_str,
-        },
-        sequential_handlers=[UnstructureDataclassToDict()],
+            Dataclass: UnstructureDataclassToDict(),
+        }
     )
 
     data = Outer(x="a", y=Inner(u=1.2, d={"a": "b", 1: 2}, lst=[1, "a"]))

@@ -5,6 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
+    Dataclass,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -65,13 +66,13 @@ def test_structure_routing():
         return val
 
     structurer = Structurer(
-        lookup_handlers={
+        {
             int: structure_into_int,
             HexInt: structure_hex_int,
             list[int]: structure_custom_generic,
             list: structure_into_list,
-        },
-        sequential_handlers=[StructureDictIntoDataclass()],
+            Dataclass: StructureDictIntoDataclass(),
+        }
     )
 
     result = structurer.structure_into(
@@ -97,11 +98,11 @@ def test_structure_generators():
         return Container(x=from_lower_level.x * 2)
 
     structurer = Structurer(
-        lookup_handlers={
+        {
             int: structure_into_int,
             Container: structure_container,
-        },
-        sequential_handlers=[StructureDictIntoDataclass()],
+            Dataclass: StructureDictIntoDataclass(),
+        }
     )
 
     assert structurer.structure_into(Container, {"x": 1}) == Container(x=22)
@@ -116,17 +117,11 @@ def test_structure_no_finalizing_handler():
     class Container:
         x: int
 
-    class MyStructureDataclass:
-        def applies(self, _unstructure_as, _val):
-            return True
+    def my_structure_dataclass(_context, val):
+        new_val = yield val
+        return new_val
 
-        def __call__(self, _structurer, _structure_into, val):
-            new_val = yield val
-            return new_val
-
-    structurer = Structurer(
-        sequential_handlers=[MyStructureDataclass()],
-    )
+    structurer = Structurer({Dataclass: my_structure_dataclass})
 
     with pytest.raises(
         StructuringError, match="Could not find a non-generator handler to structure into"
@@ -156,14 +151,14 @@ def test_error_rendering():
         y: Inner
 
     structurer = Structurer(
-        lookup_handlers={
+        {
             UnionType: structure_into_union,
             list: structure_into_list,
             dict: structure_into_dict,
             int: structure_into_int,
             str: structure_into_str,
-        },
-        sequential_handlers=[StructureDictIntoDataclass()],
+            Dataclass: StructureDictIntoDataclass(),
+        }
     )
 
     data = {"x": "a", "y": {"u": 1.2, "d": {"a": "b", 1: 2}, "lst": [1, "a"]}}

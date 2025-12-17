@@ -1,6 +1,24 @@
 Changelog
 =========
 
+0.4.0 (in development)
+----------------------
+
+Changed
+^^^^^^^
+
+- Handlers now take a single context argument (``StructurerContext`` or ``UnstructurerContext``) which contain the structurer and the target type. (PR_20_)
+
+
+Fixed
+^^^^^
+
+- Resolve type hints in dataclasses if they are given as strings. (PR_20_)
+
+
+.. _PR_20: https://github.com/fjarri-eth/compages/pull/20
+
+
 0.3.0 (2024-03-15)
 ------------------
 

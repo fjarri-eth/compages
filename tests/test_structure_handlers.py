@@ -4,8 +4,8 @@ from types import UnionType
 
 import pytest
 from compages import (
+    Dataclass,
     StructureDictIntoDataclass,
-    StructureListIntoDataclass,
     Structurer,
     StructuringError,
     structure_into_bool,
@@ -18,6 +18,7 @@ from compages import (
     structure_into_str,
     structure_into_tuple,
     structure_into_union,
+    structure_list_into_dataclass,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -35,7 +36,7 @@ def assert_exception_matches(exc, reference_exc):
 
 
 def test_structure_into_none():
-    structurer = Structurer(lookup_handlers={type(None): structure_into_none})
+    structurer = Structurer({type(None): structure_into_none})
     assert structurer.structure_into(type(None), None) is None
 
     with pytest.raises(StructuringError) as exc:
@@ -45,7 +46,7 @@ def test_structure_into_none():
 
 
 def test_structure_into_float():
-    structurer = Structurer(lookup_handlers={float: structure_into_float})
+    structurer = Structurer({float: structure_into_float})
     assert structurer.structure_into(float, 1.5) == 1.5
 
     # Specifically allow integers, but check that they are converted to floats.
@@ -60,7 +61,7 @@ def test_structure_into_float():
 
 
 def test_structure_into_bool():
-    structurer = Structurer(lookup_handlers={bool: structure_into_bool})
+    structurer = Structurer({bool: structure_into_bool})
     assert structurer.structure_into(bool, True) is True
     assert structurer.structure_into(bool, False) is False
 
@@ -71,7 +72,7 @@ def test_structure_into_bool():
 
 
 def test_structure_into_str():
-    structurer = Structurer(lookup_handlers={str: structure_into_str})
+    structurer = Structurer({str: structure_into_str})
     assert structurer.structure_into(str, "abc") == "abc"
 
     with pytest.raises(StructuringError) as exc:
@@ -81,7 +82,7 @@ def test_structure_into_str():
 
 
 def test_structure_into_bytes():
-    structurer = Structurer(lookup_handlers={bytes: structure_into_bytes})
+    structurer = Structurer({bytes: structure_into_bytes})
     assert structurer.structure_into(bytes, b"abc") == b"abc"
 
     with pytest.raises(StructuringError) as exc:
@@ -91,7 +92,7 @@ def test_structure_into_bytes():
 
 
 def test_structure_into_int():
-    structurer = Structurer(lookup_handlers={int: structure_into_int})
+    structurer = Structurer({int: structure_into_int})
     assert structurer.structure_into(int, 1) == 1
 
     with pytest.raises(StructuringError) as exc:
@@ -109,7 +110,7 @@ def test_structure_into_int():
 
 def test_structure_into_union():
     structurer = Structurer(
-        lookup_handlers={
+        {
             UnionType: structure_into_union,
             int: structure_into_int,
             str: structure_into_str,
@@ -132,7 +133,7 @@ def test_structure_into_union():
 
 def test_structure_into_tuple():
     structurer = Structurer(
-        lookup_handlers={
+        {
             tuple: structure_into_tuple,
             int: structure_into_int,
             str: structure_into_str,
@@ -169,7 +170,7 @@ def test_structure_into_tuple():
 
 
 def test_structure_into_list():
-    structurer = Structurer(lookup_handlers={list: structure_into_list, int: structure_into_int})
+    structurer = Structurer({list: structure_into_list, int: structure_into_int})
 
     assert structurer.structure_into(list[int], [1, 2, 3]) == [1, 2, 3]
     assert structurer.structure_into(list[int], (1, 2, 3)) == [1, 2, 3]
@@ -190,7 +191,7 @@ def test_structure_into_list():
 
 def test_structure_into_dict():
     structurer = Structurer(
-        lookup_handlers={
+        {
             dict: structure_into_dict,
             int: structure_into_int,
             str: structure_into_str,
@@ -223,10 +224,13 @@ def test_structure_into_dict():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_dataclass_from_list():
+def test_structure_list_into_dataclass():
     structurer = Structurer(
-        lookup_handlers={int: structure_into_int, str: structure_into_str},
-        sequential_handlers=[StructureListIntoDataclass()],
+        {
+            int: structure_into_int,
+            str: structure_into_str,
+            Dataclass: structure_list_into_dataclass,
+        },
     )
 
     @dataclass
@@ -237,6 +241,11 @@ def test_structure_dataclass_from_list():
 
     assert structurer.structure_into(Container, [1, "a"]) == Container(x=1, y="a", z="default")
     assert structurer.structure_into(Container, [1, "a", "b"]) == Container(x=1, y="a", z="b")
+
+    with pytest.raises(StructuringError) as exc:
+        structurer.structure_into(Container, {"x": 1, "y": "a", "z": "b"})
+    expected = StructuringError("Can only structure a list into a dataclass")
+    assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b", 2])
@@ -260,12 +269,51 @@ def test_structure_dataclass_from_list():
     assert_exception_matches(exc.value, expected)
 
 
-def test_structure_dataclass_from_dict():
+def test_structure_list_into_dataclass_invalid_handler():
     structurer = Structurer(
-        lookup_handlers={int: structure_into_int, str: structure_into_str},
-        sequential_handlers=[
-            StructureDictIntoDataclass(name_converter=lambda name, _metadata: name + "_")
-        ],
+        {
+            int: structure_into_int,
+            str: structure_list_into_dataclass,
+        },
+    )
+
+    with pytest.raises(
+        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
+    ):
+        structurer.structure_into(str, ["1"])
+
+
+def test_structure_list_into_dataclass_hint_resolution():
+    structurer = Structurer(
+        {int: structure_into_int, Dataclass: structure_list_into_dataclass},
+    )
+
+    @dataclass
+    class StringAnnotation:
+        x: "int"
+
+    assert structurer.structure_into(StringAnnotation, [1]) == StringAnnotation(x=1)
+
+    @dataclass
+    class UnresolvedAnnotation:
+        x: "int2"  # noqa: F821
+
+    with pytest.raises(
+        StructuringError,
+        match="Field type annotation cannot be resolved: name 'int2' is not defined",
+    ):
+        structurer.structure_into(UnresolvedAnnotation, [1])
+
+
+def test_structure_dict_into_dataclass():
+    structurer = Structurer(
+        {
+            int: structure_into_int,
+            str: structure_into_str,
+            Dataclass: StructureDictIntoDataclass(
+                name_converter=lambda name, _metadata: name + "_"
+            ),
+        },
     )
 
     @dataclass
@@ -280,6 +328,11 @@ def test_structure_dataclass_from_dict():
     assert structurer.structure_into(Container, {"x_": 1, "y_": "a", "z_": "b"}) == Container(
         x=1, y="a", z="b"
     )
+
+    with pytest.raises(StructuringError) as exc:
+        structurer.structure_into(Container, [1, "a", "b"])
+    expected = StructuringError("Can only structure a dictionary into a dataclass")
+    assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x_": 1, "z_": "b"})
@@ -299,8 +352,7 @@ def test_structure_dataclass_from_dict():
 
     # Need a structurer without a name converter for this one
     structurer = Structurer(
-        lookup_handlers={int: structure_into_int, str: structure_into_str},
-        sequential_handlers=[StructureDictIntoDataclass()],
+        {int: structure_into_int, str: structure_into_str, Dataclass: StructureDictIntoDataclass()},
     )
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "z": "b"})
@@ -309,3 +361,39 @@ def test_structure_dataclass_from_dict():
         [(StructField("y"), StructuringError(r"Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_structure_dict_into_dataclass_invalid_handler():
+    structurer = Structurer(
+        {
+            int: structure_into_int,
+            str: StructureDictIntoDataclass(),
+        },
+    )
+
+    with pytest.raises(
+        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
+    ):
+        structurer.structure_into(str, {"a": "1"})
+
+
+def test_structure_dict_into_dataclass_hint_resolution():
+    structurer = Structurer(
+        {int: structure_into_int, Dataclass: StructureDictIntoDataclass()},
+    )
+
+    @dataclass
+    class StringAnnotation:
+        x: "int"
+
+    assert structurer.structure_into(StringAnnotation, {"x": 1}) == StringAnnotation(x=1)
+
+    @dataclass
+    class UnresolvedAnnotation:
+        x: "int2"  # noqa: F821
+
+    with pytest.raises(
+        StructuringError,
+        match="Field type annotation cannot be resolved: name 'int2' is not defined",
+    ):
+        structurer.structure_into(UnresolvedAnnotation, {"x": 1})

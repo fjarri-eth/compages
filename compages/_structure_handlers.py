@@ -2,15 +2,15 @@ from collections.abc import Callable
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, get_args
+from typing import Any, get_args, get_type_hints
 
-from ._structure import SequentialStructureHandler, Structurer, StructuringError
+from ._structure import StructurerContext, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_structure(func: Callable[[Any], Any]) -> Callable[[Structurer, Any, Any], Any]:
+def simple_structure(func: Callable[[Any], Any]) -> Callable[[StructurerContext, Any], Any]:
     @wraps(func)
-    def _wrapped(_structurer: Structurer, _structure_into: Any, val: Any) -> Any:
+    def _wrapped(_context: StructurerContext, val: Any) -> Any:
         return func(val)
 
     return _wrapped
@@ -60,24 +60,24 @@ def structure_into_str(val: Any) -> str:
     return val
 
 
-def structure_into_union(structurer: Structurer, structure_into: type, val: Any) -> Any:
-    variants = get_args(structure_into)
+def structure_into_union(context: StructurerContext, val: Any) -> Any:
+    variants = get_args(context.structure_into)
 
     exceptions: list[tuple[PathElem, StructuringError]] = []
     for variant in variants:
         try:
-            return structurer.structure_into(variant, val)
+            return context.structurer.structure_into(variant, val)
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((UnionVariant(variant), exc))
 
-    raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
+    raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
 
-def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_tuple(context: StructurerContext, val: Any) -> Any:
     if not isinstance(val, list | tuple):
         raise StructuringError("Can only structure a tuple or a list into a tuple generic")
 
-    elem_types = get_args(structure_into)
+    elem_types = get_args(context.structure_into)
 
     # Homogeneous tuples (tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
@@ -96,41 +96,41 @@ def structure_into_tuple(structurer: Structurer, structure_into: type, val: Any)
     exceptions: list[tuple[PathElem, StructuringError]] = []
     for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
         try:
-            result.append(structurer.structure_into(tp, item))
+            result.append(context.structurer.structure_into(tp, item))
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
     if exceptions:
-        raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
+        raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
     return tuple(result)
 
 
-def structure_into_list(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_list(context: StructurerContext, val: Any) -> Any:
     if not isinstance(val, list | tuple):
         raise StructuringError("Can only structure a tuple or a list into a list generic")
 
-    (item_type,) = get_args(structure_into)
+    (item_type,) = get_args(context.structure_into)
 
     result = []
     exceptions: list[tuple[PathElem, StructuringError]] = []
     for index, item in enumerate(val):
         try:
-            result.append(structurer.structure_into(item_type, item))
+            result.append(context.structurer.structure_into(item_type, item))
         except StructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
     if exceptions:
-        raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
+        raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
     return result
 
 
-def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) -> Any:
+def structure_into_dict(context: StructurerContext, val: Any) -> Any:
     if not isinstance(val, dict):
         raise StructuringError("Can only structure a dict into a dict generic")
 
-    key_type, value_type = get_args(structure_into)
+    key_type, value_type = get_args(context.structure_into)
 
     result = {}
     exceptions: list[tuple[PathElem, StructuringError]] = []
@@ -138,13 +138,13 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
         success = True
 
         try:
-            structured_key = structurer.structure_into(key_type, key)
+            structured_key = context.structurer.structure_into(key_type, key)
         except StructuringError as exc:
             success = False
             exceptions.append((DictKey(key), exc))
 
         try:
-            structured_value = structurer.structure_into(value_type, value)
+            structured_value = context.structurer.structure_into(value_type, value)
         except StructuringError as exc:
             success = False
             exceptions.append((DictValue(key), exc))
@@ -153,44 +153,54 @@ def structure_into_dict(structurer: Structurer, structure_into: type, val: Any) 
             result[structured_key] = structured_value
 
     if exceptions:
-        raise StructuringError(f"Cannot structure into {structure_into}", exceptions)
+        raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
     return result
 
 
-class StructureListIntoDataclass(SequentialStructureHandler):
-    def applies(self, structure_into: Any, val: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(val, list)
+def structure_list_into_dataclass(context: StructurerContext, val: Any) -> Any:
+    if not isinstance(val, list):
+        raise StructuringError("Can only structure a list into a dataclass")
 
-    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
-        results = {}
-        exceptions: list[tuple[PathElem, StructuringError]] = []
+    results = {}
+    exceptions: list[tuple[PathElem, StructuringError]] = []
 
-        struct_fields = fields(structure_into)
+    if not is_dataclass(context.structure_into):
+        raise StructuringError(
+            f"Expected a dataclass to structure into, got {context.structure_into}"
+        )
+    struct_fields = fields(context.structure_into)
 
-        if len(val) > len(struct_fields):
-            raise StructuringError(f"Too many fields to serialize into {structure_into}")
+    try:
+        field_types = get_type_hints(context.structure_into)
+    except NameError as exc:
+        raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        for i, field in enumerate(struct_fields):
-            if i < len(val):
-                try:
-                    results[field.name] = structurer.structure_into(field.type, val[i])
-                except StructuringError as exc:
-                    exceptions.append((StructField(field.name), exc))
-            elif field.default is not MISSING:
-                results[field.name] = field.default
-            else:
-                exceptions.append((StructField(field.name), StructuringError("Missing field")))
+    if len(val) > len(struct_fields):
+        raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
 
-        if exceptions:
-            raise StructuringError(
-                f"Cannot structure a list into a dataclass {structure_into}", exceptions
-            )
+    for i, field in enumerate(struct_fields):
+        if i < len(val):
+            try:
+                results[field.name] = context.structurer.structure_into(
+                    field_types[field.name], val[i]
+                )
+            except StructuringError as exc:
+                exceptions.append((StructField(field.name), exc))
+        elif field.default is not MISSING:
+            results[field.name] = field.default
+        else:
+            exceptions.append((StructField(field.name), StructuringError("Missing field")))
 
-        return structure_into(**results)
+    if exceptions:
+        raise StructuringError(
+            f"Cannot structure a list into a dataclass {context.structure_into}", exceptions
+        )
+
+    return context.structure_into(**results)
 
 
-class StructureDictIntoDataclass(SequentialStructureHandler):
+class StructureDictIntoDataclass:
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
@@ -198,17 +208,31 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, structure_into: Any, val: Any) -> bool:
-        return is_dataclass(structure_into) and isinstance(val, dict)
+    def __call__(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, dict):
+            raise StructuringError("Can only structure a dictionary into a dataclass")
 
-    def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
-        for field in fields(structure_into):
+
+        try:
+            field_types = get_type_hints(context.structure_into)
+        except NameError as exc:
+            raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
+        if not is_dataclass(context.structure_into):
+            raise StructuringError(
+                f"Expected a dataclass to structure into, got {context.structure_into}"
+            )
+        struct_fields = fields(context.structure_into)
+
+        for field in struct_fields:
             val_name = self._name_converter(field.name, field.metadata)
             if val_name in val:
                 try:
-                    results[field.name] = structurer.structure_into(field.type, val[val_name])
+                    results[field.name] = context.structurer.structure_into(
+                        field_types[field.name], val[val_name]
+                    )
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:
@@ -222,7 +246,7 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
 
         if exceptions:
             raise StructuringError(
-                f"Cannot structure a dict into a dataclass {structure_into}", exceptions
+                f"Cannot structure a dict into a dataclass {context.structure_into}", exceptions
             )
 
-        return structure_into(**results)
+        return context.structure_into(**results)

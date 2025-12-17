@@ -2,15 +2,19 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, NewType, get_args
+from typing import Any, get_args, get_type_hints
 
-from ._unstructure import SequentialUnstructureHandler, Unstructurer, UnstructuringError
+from ._common import TypedNewType
+from ._unstructure import (
+    UnstructurerContext,
+    UnstructuringError,
+)
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[Unstructurer, Any, Any], Any]:
+def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[UnstructurerContext, Any], Any]:
     @wraps(func)
-    def _wrapped(_unstructurer: Unstructurer, _unstructure_as: Any, val: Any) -> Any:
+    def _wrapped(_context: UnstructurerContext, val: Any) -> Any:
         return func(val)
 
     return _wrapped
@@ -18,19 +22,21 @@ def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[Unstructurer, An
 
 def simple_typechecked_unstructure(
     func: Callable[[Any], Any],
-) -> Callable[[Unstructurer, Any, Any], Any]:
+) -> Callable[[UnstructurerContext, Any], Any]:
     @wraps(func)
-    def _wrapped(_unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
-        if isinstance(unstructure_as, NewType):
-            base_type = unstructure_as.__supertype__
-            # Despite Mypy complaining, `NewType`'s `__supertype__` can indeed be another newtype,
+    def _wrapped(context: UnstructurerContext, val: Any) -> Any:
+        if isinstance(context.unstructure_as, TypedNewType):
+            base_type = context.unstructure_as.__supertype__
+            # `NewType`'s `__supertype__` can be another newtype,
             # so we have to follow the chain until we reach something that's not a `NewType`.
-            while isinstance(base_type, NewType):  # type: ignore[unreachable]
-                base_type = base_type.__supertype__  # type: ignore[unreachable]
+            while isinstance(base_type, TypedNewType):
+                base_type = base_type.__supertype__
             if not isinstance(val, base_type):
                 raise UnstructuringError(f"The value must be of type `{base_type.__name__}`")
-        elif not isinstance(val, unstructure_as):
-            raise UnstructuringError(f"The value must be of type `{unstructure_as.__name__}`")
+        elif not isinstance(val, context.unstructure_as):
+            raise UnstructuringError(
+                f"The value must be of type `{context.unstructure_as.__name__}`"
+            )
         return func(val)
 
     return _wrapped
@@ -70,24 +76,24 @@ def unstructure_as_str(val: str) -> str:
     return str(val)
 
 
-def unstructure_as_union(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
-    variants = get_args(unstructure_as)
+def unstructure_as_union(context: UnstructurerContext, val: Any) -> Any:
+    variants = get_args(context.unstructure_as)
 
     exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for variant in variants:
         try:
-            return unstructurer.unstructure_as(variant, val)
+            return context.unstructurer.unstructure_as(variant, val)
         except UnstructuringError as exc:  # noqa: PERF203
             exceptions.append((UnionVariant(variant), exc))
 
-    raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+    raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
 
-def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
+def unstructure_as_tuple(context: UnstructurerContext, val: Any) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a tuple")
 
-    elem_types = get_args(unstructure_as)
+    elem_types = get_args(context.unstructure_as)
 
     # Homogeneous tuples (tuple[some_type, ...])
     if len(elem_types) == 2 and elem_types[1] == ...:
@@ -106,34 +112,34 @@ def unstructure_as_tuple(unstructurer: Unstructurer, unstructure_as: Any, val: A
     exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
         try:
-            result.append(unstructurer.unstructure_as(tp, item))
+            result.append(context.unstructurer.unstructure_as(tp, item))
         except UnstructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
     if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
     return result
 
 
-def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: Any) -> Any:
+def unstructure_as_dict(context: UnstructurerContext, val: Any) -> Any:
     if not isinstance(val, Mapping):
         raise UnstructuringError("Can only unstructure a Mapping as a dict")
 
-    key_type, value_type = get_args(unstructure_as)
+    key_type, value_type = get_args(context.unstructure_as)
 
     result = {}
     exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for key, value in val.items():
         success = True
         try:
-            unstructured_key = unstructurer.unstructure_as(key_type, key)
+            unstructured_key = context.unstructurer.unstructure_as(key_type, key)
         except UnstructuringError as exc:
             success = False
             exceptions.append((DictKey(key), exc))
 
         try:
-            unstructured_value = unstructurer.unstructure_as(value_type, value)
+            unstructured_value = context.unstructurer.unstructure_as(value_type, value)
         except UnstructuringError as exc:
             success = False
             exceptions.append((DictValue(key), exc))
@@ -142,32 +148,32 @@ def unstructure_as_dict(unstructurer: Unstructurer, unstructure_as: type, val: A
             result[unstructured_key] = unstructured_value
 
     if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
     return result
 
 
-def unstructure_as_list(unstructurer: Unstructurer, unstructure_as: type, val: list[Any]) -> Any:
+def unstructure_as_list(context: UnstructurerContext, val: list[Any]) -> Any:
     if not isinstance(val, Sequence):
         raise UnstructuringError("Can only unstructure a Sequence as a list")
 
-    (item_type,) = get_args(unstructure_as)
+    (item_type,) = get_args(context.unstructure_as)
 
     result = []
     exceptions: list[tuple[PathElem, UnstructuringError]] = []
     for index, item in enumerate(val):
         try:
-            result.append(unstructurer.unstructure_as(item_type, item))
+            result.append(context.unstructurer.unstructure_as(item_type, item))
         except UnstructuringError as exc:  # noqa: PERF203
             exceptions.append((ListElem(index), exc))
 
     if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
     return result
 
 
-class UnstructureDataclassToDict(SequentialUnstructureHandler):
+class UnstructureDataclassToDict:
     def __init__(
         self,
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
@@ -175,13 +181,22 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
     ):
         self._name_converter = name_converter
 
-    def applies(self, unstructure_as: Any, val: Any) -> bool:
-        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
-
-    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
+    def __call__(self, context: UnstructurerContext, val: Any) -> Any:
         result = {}
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
-        for field in fields(unstructure_as):
+
+        try:
+            field_types = get_type_hints(context.unstructure_as)
+        except NameError as exc:
+            raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
+        if not is_dataclass(context.unstructure_as):
+            raise UnstructuringError(
+                f"Expected a dataclass to structure into, got {context.unstructure_as}"
+            )
+        struct_fields = fields(context.unstructure_as)
+
+        for field in struct_fields:
             result_name = self._name_converter(field.name, field.metadata)
             value = getattr(val, field.name)
             # If the value field is equal to the default one, don't add it to the result.
@@ -192,30 +207,44 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
             except Exception:  # noqa: S110, BLE001
                 pass
             try:
-                result[result_name] = unstructurer.unstructure_as(field.type, value)
+                result[result_name] = context.unstructurer.unstructure_as(
+                    field_types[field.name], value
+                )
             except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
         if exceptions:
-            raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
         return result
 
 
-class UnstructureDataclassToList(SequentialUnstructureHandler):
-    def applies(self, unstructure_as: Any, val: Any) -> bool:
-        return is_dataclass(unstructure_as) and isinstance(val, unstructure_as)
+def unstructure_dataclass_to_list(context: UnstructurerContext, val: Any) -> Any:
+    result = []
+    exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
-    def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
-        result = []
-        exceptions: list[tuple[PathElem, UnstructuringError]] = []
-        for field in fields(unstructure_as):
-            try:
-                result.append(unstructurer.unstructure_as(field.type, getattr(val, field.name)))
-            except UnstructuringError as exc:  # noqa: PERF203
-                exceptions.append((StructField(field.name), exc))
+    try:
+        field_types = get_type_hints(context.unstructure_as)
+    except NameError as exc:
+        raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
 
-        if exceptions:
-            raise UnstructuringError(f"Cannot unstructure as {unstructure_as}", exceptions)
+    if not is_dataclass(context.unstructure_as):
+        raise UnstructuringError(
+            f"Expected a dataclass to structure into, got {context.unstructure_as}"
+        )
+    struct_fields = fields(context.unstructure_as)
 
-        return result
+    for field in struct_fields:
+        try:
+            result.append(
+                context.unstructurer.unstructure_as(
+                    field_types[field.name], getattr(val, field.name)
+                )
+            )
+        except UnstructuringError as exc:  # noqa: PERF203
+            exceptions.append((StructField(field.name), exc))
+
+    if exceptions:
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+
+    return result

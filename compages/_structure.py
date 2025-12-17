@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
-from ._common import GeneratorStack, Result, get_lookup_order
+from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
 from .path import PathElem
 
 
@@ -38,23 +38,29 @@ class SequentialStructureHandler(ABC):
     def applies(self, structure_into: Any, val: Any) -> bool: ...
 
     @abstractmethod
-    def __call__(self, structurer: "Structurer", structure_into: Any, val: Any) -> Any: ...
+    def __call__(self, context: "StructurerContext", val: Any) -> Any: ...
 
 
 _T = TypeVar("_T")
 
 
+class StructurerContext(NamedTuple):
+    structurer: "Structurer"
+    structure_into: ExtendedType[Any]
+
+
 class Structurer:
     def __init__(
         self,
-        lookup_handlers: Mapping[Any, Callable[["Structurer", type, Any], Any]] = {},
+        lookup_handlers: Mapping[Any, Callable[[StructurerContext, Any], Any]] = {},
         sequential_handlers: Iterable[SequentialStructureHandler] = [],
     ):
         self._lookup_handlers = lookup_handlers
         self._sequential_handlers = sequential_handlers
 
-    def structure_into(self, structure_into: type[_T] | Callable[[Any], _T], val: Any) -> _T:
-        stack = GeneratorStack[_T]((self, structure_into), val)
+    def structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
+        context = StructurerContext(structurer=self, structure_into=structure_into)
+        stack = GeneratorStack[StructurerContext, _T](context, val)
         lookup_order = get_lookup_order(structure_into)
 
         for tp in lookup_order:

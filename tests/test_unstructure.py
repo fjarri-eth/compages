@@ -114,7 +114,7 @@ def test_unstructure_no_finalizing_handler():
         def applies(self, _unstructure_as, _val):
             return True
 
-        def __call__(self, _unstructurer, _unstructure_as, val):
+        def __call__(self, _context, val):
             new_val = yield val
             return new_val
 

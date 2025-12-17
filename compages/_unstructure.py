@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Mapping
-from typing import Any, TypeVar
+from typing import Any, NamedTuple, TypeVar
 
-from ._common import GeneratorStack, Result, get_lookup_order
+from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
 from .path import PathElem
 
 
@@ -40,23 +40,29 @@ class SequentialUnstructureHandler(ABC):
     def applies(self, unstructure_as: Any, val: Any) -> bool: ...
 
     @abstractmethod
-    def __call__(self, unstructurer: "Unstructurer", unstructure_as: Any, val: Any) -> Any: ...
+    def __call__(self, context: "UnstructurerContext", val: Any) -> Any: ...
 
 
 _T = TypeVar("_T")
 
 
+class UnstructurerContext(NamedTuple):
+    unstructurer: "Unstructurer"
+    unstructure_as: ExtendedType[Any]
+
+
 class Unstructurer:
     def __init__(
         self,
-        lookup_handlers: Mapping[Any, Callable[["Unstructurer", Any, Any], Any]] = {},
+        lookup_handlers: Mapping[Any, Callable[[UnstructurerContext, Any], Any]] = {},
         sequential_handlers: Iterable[SequentialUnstructureHandler] = [],
     ):
         self._lookup_handlers = dict(lookup_handlers)
         self._sequential_handlers = list(sequential_handlers)
 
-    def unstructure_as(self, unstructure_as: type[_T] | Callable[[Any], _T], val: Any) -> Any:
-        stack = GeneratorStack[Any]((self, unstructure_as), val)
+    def unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+        context = UnstructurerContext(unstructurer=self, unstructure_as=unstructure_as)
+        stack = GeneratorStack[UnstructurerContext, Any](context, val)
         lookup_order = get_lookup_order(unstructure_as)
 
         for tp in lookup_order:

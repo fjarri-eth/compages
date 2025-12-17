@@ -8,6 +8,7 @@ from compages import (
     UnstructureDataclassToDict,
     UnstructureDataclassToList,
     Unstructurer,
+    UnstructurerContext,
     UnstructuringError,
     simple_typechecked_unstructure,
     simple_unstructure,
@@ -45,16 +46,16 @@ def test_simple_typechecked_unstructure():
     def unstructure_int(val):
         return val
 
-    assert unstructure_int(None, A, 1) == 1
-    assert unstructure_int(None, B, 1) == 1
-    assert unstructure_int(None, int, 1) == 1
+    assert unstructure_int(UnstructurerContext(None, A), 1) == 1
+    assert unstructure_int(UnstructurerContext(None, B), 1) == 1
+    assert unstructure_int(UnstructurerContext(None, int), 1) == 1
 
     with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(None, A, "a")
+        unstructure_int(UnstructurerContext(None, A), "a")
     with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(None, B, "a")
+        unstructure_int(UnstructurerContext(None, B), "a")
     with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(None, int, "a")
+        unstructure_int(UnstructurerContext(None, int), "a")
 
 
 def test_unstructure_as_none():

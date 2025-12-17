@@ -1,6 +1,7 @@
 from ._structure import (
     SequentialStructureHandler,
     Structurer,
+    StructurerContext,
     StructuringError,
 )
 from ._structure_handlers import (
@@ -21,6 +22,7 @@ from ._structure_handlers import (
 from ._unstructure import (
     SequentialUnstructureHandler,
     Unstructurer,
+    UnstructurerContext,
     UnstructuringError,
 )
 from ._unstructure_handlers import (
@@ -46,10 +48,12 @@ __all__ = [
     "StructureDictIntoDataclass",
     "StructureListIntoDataclass",
     "Structurer",
+    "StructurerContext",
     "StructuringError",
     "UnstructureDataclassToDict",
     "UnstructureDataclassToList",
     "Unstructurer",
+    "UnstructurerContext",
     "UnstructuringError",
     "simple_structure",
     "simple_typechecked_unstructure",

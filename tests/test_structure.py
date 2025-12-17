@@ -120,7 +120,7 @@ def test_structure_no_finalizing_handler():
         def applies(self, _unstructure_as, _val):
             return True
 
-        def __call__(self, _structurer, _structure_into, val):
+        def __call__(self, _context, val):
             new_val = yield val
             return new_val
 

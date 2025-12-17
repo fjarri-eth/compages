@@ -4,6 +4,12 @@ Changelog
 0.4.0 (in development)
 ----------------------
 
+Changed
+^^^^^^^
+
+- Handlers now take a single context argument (``StructurerContext`` or ``UnstructurerContext``) which contain the structurer and the target type. (PR_20_)
+
+
 Fixed
 ^^^^^
 

@@ -1,18 +1,28 @@
 from collections.abc import Callable, Generator
 from enum import Enum
 from types import GeneratorType
-from typing import Any, Generic, Literal, NewType, ParamSpec, TypeVar, cast, get_origin
-
-P = ParamSpec("P")
+from typing import (
+    Any,
+    Generic,
+    Literal,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    cast,
+    get_origin,
+    runtime_checkable,
+)
 
 _ResultType = TypeVar("_ResultType")
+
+_ContextType = TypeVar("_ContextType")
 
 
 class Result(Enum):
     UNDEFINED = "result undefined"
 
 
-class GeneratorStack(Generic[_ResultType]):
+class GeneratorStack(Generic[_ContextType, _ResultType]):
     """
     Maintains a stack of suspended continuations that take fixed arguments (``args``)
     and a value, yield a value to use to create the next continuation,
@@ -21,17 +31,17 @@ class GeneratorStack(Generic[_ResultType]):
     The stack is unrolled as soon as a function returning a result and not a continuation is pushed.
     """
 
-    def __init__(self, args: tuple[Any, ...], value: Any):
-        self._args = args
+    def __init__(self, context: _ContextType, value: Any):
+        self._context = context
         self._generators: list[Generator[_ResultType, Any, Any]] = []
         self._value = value
 
     def push(
-        self, func: None | Callable[P, _ResultType]
+        self, func: None | Callable[[_ContextType, Any], _ResultType]
     ) -> _ResultType | Literal[Result.UNDEFINED]:
         """
-        Takes a function that takes the fixed ``args`` passed to the constructor
-        and the current ``value``, and either returns a result or a continuation.
+        Takes a function that takes two arguments (``context`` passed to the constructor
+        and the current ``value``), and either returns a result or a continuation.
 
         If ``func`` is ``None``, no action is taken.
 
@@ -47,7 +57,7 @@ class GeneratorStack(Generic[_ResultType]):
         if func is None:
             return Result.UNDEFINED
 
-        result = func(*self._args, self._value)
+        result = func(self._context, self._value)
 
         if isinstance(result, GeneratorType):
             # Advance to the first `yield` and get the value to pass to the lower levels.
@@ -70,7 +80,27 @@ class GeneratorStack(Generic[_ResultType]):
         return not self._generators
 
 
-def get_lookup_order(tp: Any) -> list[Any]:
+_T_co = TypeVar("_T_co", covariant=True)
+
+
+# Unfortunately, `NewType` in Python is not generic, so we cannot express the concept of
+# "the type of instances of of this type, given the type's type annotation"
+#
+# This protocol covers any instance of `NewType` and has the same properties as `type[_T]`.
+@runtime_checkable
+class TypedNewType(Protocol, Generic[_T_co]):
+    def __call__(self, value: Any) -> _T_co: ...
+
+    __supertype__: "type[Any] | TypedNewType[Any]"
+
+
+_T = TypeVar("_T")
+
+
+ExtendedType: TypeAlias = type[_T] | TypedNewType[_T]
+
+
+def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     """
     Returns the structuring/unstructuring handler lookup order for regular types, generic types,
     or newtypes.
@@ -89,7 +119,7 @@ def get_lookup_order(tp: Any) -> list[Any]:
         has the origin ``typing.Union``, but ``type1 | type2 | ...`` has the origin
         ``types.UnionType``.
     """
-    if isinstance(tp, NewType):
+    if isinstance(tp, TypedNewType):
         return [tp, *get_lookup_order(tp.__supertype__)]
 
     origin = get_origin(tp)
@@ -97,6 +127,10 @@ def get_lookup_order(tp: Any) -> list[Any]:
         return [tp, *get_lookup_order(origin)]
 
     if hasattr(tp, "mro"):
-        return cast("list[Any]", tp.mro()[:-1])
+        # [:-1] removes the last element of the MRO (`object`).
+        mro = tp.mro()[:-1]
+
+        # Can cast here since all the elements will be isntances of `type`.
+        return cast("list[ExtendedType[Any]]", mro)
 
     return [tp]

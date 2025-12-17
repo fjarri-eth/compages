@@ -18,8 +18,8 @@ from ._structure_handlers import (
     structure_into_str,
     structure_into_tuple,
     structure_into_union,
-    structure_list_into_dataclass,
-    structure_list_into_named_tuple,
+    structure_sequence_into_dataclass,
+    structure_sequence_into_named_tuple,
 )
 from ._unstructure import (
     Unstructurer,
@@ -71,8 +71,8 @@ __all__ = [
     "structure_into_str",
     "structure_into_tuple",
     "structure_into_union",
-    "structure_list_into_dataclass",
-    "structure_list_into_named_tuple",
+    "structure_sequence_into_dataclass",
+    "structure_sequence_into_named_tuple",
     "unstructure_as_bool",
     "unstructure_as_bytes",
     "unstructure_as_dict",

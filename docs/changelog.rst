@@ -8,6 +8,7 @@ Changed
 ^^^^^^^
 
 - Handlers now take a single context argument (``StructurerContext`` or ``UnstructurerContext``) which contain the structurer and the target type. (PR_20_)
+- Support any ``Sequence`` type instead of just a list when structuring into a struct-like. Consequently, the handlers had ``list`` changed to ``sequence``. (PR_22_)
 
 
 Added
@@ -25,6 +26,7 @@ Fixed
 
 .. _PR_20: https://github.com/fjarri-eth/compages/pull/20
 .. _PR_21: https://github.com/fjarri-eth/compages/pull/21
+.. _PR_22: https://github.com/fjarri-eth/compages/pull/22
 
 
 0.3.0 (2024-03-15)

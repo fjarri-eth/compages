@@ -17,9 +17,9 @@ class NoDefault:
 class Field(NamedTuple):
     name: str
     type: type[Any]
-    default: Any
-    default_factory: None | Callable[[], Any]
-    metadata: MappingProxyType[Any, Any]
+    default: Any = NoDefault
+    default_factory: None | Callable[[], Any] = None
+    metadata: MappingProxyType[Any, Any] = MappingProxyType({})
 
 
 def get_fields_named_tuple(tp: ExtendedType[Any]) -> list[Field]:
@@ -69,7 +69,11 @@ def get_fields_dataclass(tp: ExtendedType[Any]) -> list[Field]:
             default = NoDefault
         else:
             default = dc_field.default
-        # TODO: support default factory
+
+        if dc_field.default_factory is dataclasses.MISSING:
+            default_factory = None
+        else:
+            default_factory = dc_field.default_factory
 
         fields.append(
             Field(
@@ -77,7 +81,7 @@ def get_fields_dataclass(tp: ExtendedType[Any]) -> list[Field]:
                 type=field_types[dc_field.name],
                 default=default,
                 metadata=dc_field.metadata,
-                default_factory=None,
+                default_factory=default_factory,
             )
         )
 

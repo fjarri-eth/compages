@@ -1,8 +1,10 @@
+from collections import namedtuple
+from dataclasses import dataclass
 from types import UnionType
-from typing import NewType, Union
+from typing import NamedTuple, NewType, Union
 
 import pytest
-from compages._common import GeneratorStack, Result, get_lookup_order
+from compages._common import Dataclass, GeneratorStack, NamedTupleBase, Result, get_lookup_order
 
 
 def test_normal_operation():
@@ -69,3 +71,22 @@ def test_lookup_order():
     assert get_lookup_order(E) == [E, list[D], list]
     assert get_lookup_order(int | str) == [int | str, UnionType]
     assert get_lookup_order(Union[int, str]) == [Union[int, str], Union]  # noqa: UP007
+
+    @dataclass
+    class DataclassContainer:
+        x: int
+
+    assert get_lookup_order(DataclassContainer) == [DataclassContainer, Dataclass]
+
+    class NamedTupleContainer(NamedTuple):
+        x: int
+
+    assert get_lookup_order(NamedTupleContainer) == [NamedTupleContainer, NamedTupleBase, tuple]
+
+    # Test that `namedtuple`-created classes pass the check as well
+    NamedTupleContainerAlt = namedtuple("NamedTupleContainerAlt", ["x"])  # noqa: PYI024
+    assert get_lookup_order(NamedTupleContainerAlt) == [
+        NamedTupleContainerAlt,
+        NamedTupleBase,
+        tuple,
+    ]

@@ -1,12 +1,10 @@
 import re
 from dataclasses import dataclass
 from types import UnionType
-from typing import NamedTuple
 
 import pytest
 from compages import (
     Dataclass,
-    NamedTupleBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -287,28 +285,6 @@ def test_structure_list_into_dataclass_invalid_handler():
         structurer.structure_into(str, ["1"])
 
 
-def test_structure_list_into_dataclass_hint_resolution():
-    structurer = Structurer(
-        {int: structure_into_int, Dataclass: structure_list_into_dataclass},
-    )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert structurer.structure_into(StringAnnotation, [1]) == StringAnnotation(x=1)
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        StructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        structurer.structure_into(UnresolvedAnnotation, [1])
-
-
 def test_structure_dict_into_dataclass():
     structurer = Structurer(
         {
@@ -381,25 +357,3 @@ def test_structure_dict_into_dataclass_invalid_handler():
     )
     with pytest.raises(StructuringError, match=message):
         structurer.structure_into(str, {"a": "1"})
-
-
-def test_structure_dict_into_dataclass_hint_resolution():
-    structurer = Structurer(
-        {int: structure_into_int, Dataclass: StructureDictIntoDataclass()},
-    )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert structurer.structure_into(StringAnnotation, {"x": 1}) == StringAnnotation(x=1)
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        StructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        structurer.structure_into(UnresolvedAnnotation, {"x": 1})

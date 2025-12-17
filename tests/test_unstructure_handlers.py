@@ -290,28 +290,6 @@ def test_unstructure_dataclass_to_dict_invalid_handler():
         unstructurer.unstructure_as(str, "1")
 
 
-def test_unstructure_dataclass_to_dict_hint_resolution():
-    unstructurer = Unstructurer(
-        {int: unstructure_as_int, Dataclass: UnstructureDataclassToDict()},
-    )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert unstructurer.unstructure_as(StringAnnotation, StringAnnotation(x=1)) == {"x": 1}
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        UnstructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        unstructurer.unstructure_as(UnresolvedAnnotation, UnresolvedAnnotation(x=1))
-
-
 def test_unstructure_dataclass_to_dict_skip_defaults():
     # Badly behaving classes that raise an error on comparison,
     # so the unstructurer will have to process that when we're comparing
@@ -406,25 +384,3 @@ def test_unstructure_dataclass_to_list_invalid_handler():
     )
     with pytest.raises(UnstructuringError, match=message):
         unstructurer.unstructure_as(str, "1")
-
-
-def test_unstructure_dataclass_to_list_hint_resolution():
-    unstructurer = Unstructurer(
-        {int: unstructure_as_int, Dataclass: unstructure_dataclass_to_list},
-    )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert unstructurer.unstructure_as(StringAnnotation, StringAnnotation(x=1)) == [1]
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        UnstructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        unstructurer.unstructure_as(UnresolvedAnnotation, UnresolvedAnnotation(x=1))

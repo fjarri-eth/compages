@@ -2,7 +2,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, NewType, get_args
+from typing import Any, NewType, get_args, get_type_hints
 
 from ._unstructure import SequentialUnstructureHandler, Unstructurer, UnstructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
@@ -181,6 +181,12 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
     def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = {}
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
+
+        try:
+            field_types = get_type_hints(unstructure_as)
+        except NameError as exc:
+            raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
         for field in fields(unstructure_as):
             result_name = self._name_converter(field.name, field.metadata)
             value = getattr(val, field.name)
@@ -192,7 +198,7 @@ class UnstructureDataclassToDict(SequentialUnstructureHandler):
             except Exception:  # noqa: S110, BLE001
                 pass
             try:
-                result[result_name] = unstructurer.unstructure_as(field.type, value)
+                result[result_name] = unstructurer.unstructure_as(field_types[field.name], value)
             except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
@@ -209,9 +215,17 @@ class UnstructureDataclassToList(SequentialUnstructureHandler):
     def __call__(self, unstructurer: Unstructurer, unstructure_as: Any, val: Any) -> Any:
         result = []
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
+
+        try:
+            field_types = get_type_hints(unstructure_as)
+        except NameError as exc:
+            raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
         for field in fields(unstructure_as):
             try:
-                result.append(unstructurer.unstructure_as(field.type, getattr(val, field.name)))
+                result.append(
+                    unstructurer.unstructure_as(field_types[field.name], getattr(val, field.name))
+                )
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 

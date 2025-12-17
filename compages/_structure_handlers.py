@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import MISSING, fields, is_dataclass
 from functools import wraps
 from types import MappingProxyType
-from typing import Any, get_args
+from typing import Any, get_args, get_type_hints
 
 from ._structure import SequentialStructureHandler, Structurer, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
@@ -168,13 +168,18 @@ class StructureListIntoDataclass(SequentialStructureHandler):
 
         struct_fields = fields(structure_into)
 
+        try:
+            field_types = get_type_hints(structure_into)
+        except NameError as exc:
+            raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
         if len(val) > len(struct_fields):
             raise StructuringError(f"Too many fields to serialize into {structure_into}")
 
         for i, field in enumerate(struct_fields):
             if i < len(val):
                 try:
-                    results[field.name] = structurer.structure_into(field.type, val[i])
+                    results[field.name] = structurer.structure_into(field_types[field.name], val[i])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:
@@ -204,11 +209,19 @@ class StructureDictIntoDataclass(SequentialStructureHandler):
     def __call__(self, structurer: Structurer, structure_into: Any, val: Any) -> Any:
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
+
+        try:
+            field_types = get_type_hints(structure_into)
+        except NameError as exc:
+            raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+
         for field in fields(structure_into):
             val_name = self._name_converter(field.name, field.metadata)
             if val_name in val:
                 try:
-                    results[field.name] = structurer.structure_into(field.type, val[val_name])
+                    results[field.name] = structurer.structure_into(
+                        field_types[field.name], val[val_name]
+                    )
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
             elif field.default is not MISSING:

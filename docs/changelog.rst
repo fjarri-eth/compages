@@ -1,6 +1,18 @@
 Changelog
 =========
 
+0.4.0 (in development)
+----------------------
+
+Fixed
+^^^^^
+
+- Resolve type hints in dataclasses if they are given as strings. (PR_20_)
+
+
+.. _PR_20: https://github.com/fjarri-eth/compages/pull/20
+
+
 0.3.0 (2024-03-15)
 ------------------
 

@@ -260,6 +260,29 @@ def test_structure_dataclass_from_list():
     assert_exception_matches(exc.value, expected)
 
 
+def test_structure_dataclass_from_list_hint_resolution():
+    structurer = Structurer(
+        lookup_handlers={int: structure_into_int},
+        sequential_handlers=[StructureListIntoDataclass()],
+    )
+
+    @dataclass
+    class StringAnnotation:
+        x: "int"
+
+    assert structurer.structure_into(StringAnnotation, [1]) == StringAnnotation(x=1)
+
+    @dataclass
+    class UnresolvedAnnotation:
+        x: "int2"  # noqa: F821
+
+    with pytest.raises(
+        StructuringError,
+        match="Field type annotation cannot be resolved: name 'int2' is not defined",
+    ):
+        structurer.structure_into(UnresolvedAnnotation, [1])
+
+
 def test_structure_dataclass_from_dict():
     structurer = Structurer(
         lookup_handlers={int: structure_into_int, str: structure_into_str},
@@ -309,3 +332,26 @@ def test_structure_dataclass_from_dict():
         [(StructField("y"), StructuringError(r"Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_structure_dataclass_from_dict_hint_resolution():
+    structurer = Structurer(
+        lookup_handlers={int: structure_into_int},
+        sequential_handlers=[StructureDictIntoDataclass()],
+    )
+
+    @dataclass
+    class StringAnnotation:
+        x: "int"
+
+    assert structurer.structure_into(StringAnnotation, {"x": 1}) == StringAnnotation(x=1)
+
+    @dataclass
+    class UnresolvedAnnotation:
+        x: "int2"  # noqa: F821
+
+    with pytest.raises(
+        StructuringError,
+        match="Field type annotation cannot be resolved: name 'int2' is not defined",
+    ):
+        structurer.structure_into(UnresolvedAnnotation, {"x": 1})

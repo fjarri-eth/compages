@@ -1,11 +1,11 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import UnionType
 from typing import NewType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     UnstructureDataclassToDict,
     Unstructurer,
     UnstructurerContext,
@@ -248,7 +248,7 @@ def test_unstructure_dataclass_to_dict():
         {
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: UnstructureDataclassToDict(
+            DataclassBase: UnstructureDataclassToDict(
                 name_converter=lambda name, _metadata: name + "_"
             ),
         },
@@ -269,7 +269,7 @@ def test_unstructure_dataclass_to_dict():
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
-        "Cannot unstructure as",
+        "Failed to unstructure to a dict as",
         [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -283,32 +283,11 @@ def test_unstructure_dataclass_to_dict_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
-        unstructurer.unstructure_as(str, "1")
-
-
-def test_unstructure_dataclass_to_dict_hint_resolution():
-    unstructurer = Unstructurer(
-        {int: unstructure_as_int, Dataclass: UnstructureDataclassToDict()},
+    message = (
+        "Failed to fetch field metadata for the value `1`: Expected a dataclass, got <class 'str'>"
     )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert unstructurer.unstructure_as(StringAnnotation, StringAnnotation(x=1)) == {"x": 1}
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        UnstructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        unstructurer.unstructure_as(UnresolvedAnnotation, UnresolvedAnnotation(x=1))
+    with pytest.raises(UnstructuringError, match=message):
+        unstructurer.unstructure_as(str, "1")
 
 
 def test_unstructure_dataclass_to_dict_skip_defaults():
@@ -339,6 +318,7 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
         x: int
         y: str = "b"
         z: A | B = b
+        w: str = field(default_factory=lambda: "c")
 
     @simple_unstructure
     def unstructure_a(_val):
@@ -355,12 +335,12 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
             B: unstructure_b,
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: UnstructureDataclassToDict(),
+            DataclassBase: UnstructureDataclassToDict(),
         },
     )
 
     # `y` will not be present in the results since its value is equal to the default one
-    assert unstructurer.unstructure_as(Container, Container(x=1, y="b", z=A())) == {
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="b", z=A(), w="c")) == {
         "x": 1,
         "z": "A",
     }
@@ -371,7 +351,7 @@ def test_unstructure_dataclass_to_list():
         {
             int: unstructure_as_int,
             str: unstructure_as_str,
-            Dataclass: unstructure_dataclass_to_list,
+            DataclassBase: unstructure_dataclass_to_list,
         },
     )
 
@@ -386,7 +366,7 @@ def test_unstructure_dataclass_to_list():
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
-        "Cannot unstructure as",
+        "Failed to unstructure to a list as",
         [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -400,29 +380,8 @@ def test_unstructure_dataclass_to_list_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
-        unstructurer.unstructure_as(str, "1")
-
-
-def test_unstructure_dataclass_to_list_hint_resolution():
-    unstructurer = Unstructurer(
-        {int: unstructure_as_int, Dataclass: unstructure_dataclass_to_list},
+    message = (
+        "Failed to fetch field metadata for the value `1`: Expected a dataclass, got <class 'str'>"
     )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert unstructurer.unstructure_as(StringAnnotation, StringAnnotation(x=1)) == [1]
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        UnstructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        unstructurer.unstructure_as(UnresolvedAnnotation, UnresolvedAnnotation(x=1))
+    with pytest.raises(UnstructuringError, match=message):
+        unstructurer.unstructure_as(str, "1")

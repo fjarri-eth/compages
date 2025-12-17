@@ -1,10 +1,16 @@
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import MISSING, fields, is_dataclass
-from functools import wraps
+from functools import partial, wraps
 from types import MappingProxyType
-from typing import Any, get_args, get_type_hints
+from typing import Any, get_args
 
-from ._common import TypedNewType
+from ._common import ExtendedType, TypedNewType
+from ._struct_like import (
+    Field,
+    NoDefault,
+    StructAdapterError,
+    get_fields_dataclass,
+    get_fields_named_tuple,
+)
 from ._unstructure import (
     UnstructurerContext,
     UnstructuringError,
@@ -173,12 +179,14 @@ def unstructure_as_list(context: UnstructurerContext, val: list[Any]) -> Any:
     return result
 
 
-class UnstructureDataclassToDict:
+class _UnstructureStructLikeToDict:
     def __init__(
         self,
+        get_fields: Callable[[ExtendedType[Any]], list[Field]],
         name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
         _metadata: name,
     ):
+        self._get_fields = get_fields
         self._name_converter = name_converter
 
     def __call__(self, context: UnstructurerContext, val: Any) -> Any:
@@ -186,65 +194,73 @@ class UnstructureDataclassToDict:
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
         try:
-            field_types = get_type_hints(context.unstructure_as)
-        except NameError as exc:
-            raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
-
-        if not is_dataclass(context.unstructure_as):
+            struct_fields = self._get_fields(context.unstructure_as)
+        except StructAdapterError as exc:
             raise UnstructuringError(
-                f"Expected a dataclass to structure into, got {context.unstructure_as}"
-            )
-        struct_fields = fields(context.unstructure_as)
+                f"Failed to fetch field metadata for the value `{val}`: {exc}"
+            ) from exc
 
         for field in struct_fields:
             result_name = self._name_converter(field.name, field.metadata)
             value = getattr(val, field.name)
             # If the value field is equal to the default one, don't add it to the result.
             try:
-                if field.default is not MISSING and value == field.default:
+                if (field.default is not NoDefault and value == field.default) or (
+                    field.default_factory is not None and value == field.default_factory()
+                ):
                     continue
             # On the off-chance the comparison is strict and raises an exception on type mismatch
             except Exception:  # noqa: S110, BLE001
                 pass
             try:
-                result[result_name] = context.unstructurer.unstructure_as(
-                    field_types[field.name], value
-                )
+                result[result_name] = context.unstructurer.unstructure_as(field.type, value)
             except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
         if exceptions:
-            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+            raise UnstructuringError(
+                f"Failed to unstructure to a dict as {context.unstructure_as}", exceptions
+            )
 
         return result
 
 
-def unstructure_dataclass_to_list(context: UnstructurerContext, val: Any) -> Any:
-    result = []
-    exceptions: list[tuple[PathElem, UnstructuringError]] = []
+class _UnstructureStructLikeToList:
+    def __init__(
+        self,
+        get_fields: Callable[[ExtendedType[Any]], list[Field]],
+    ):
+        self._get_fields = get_fields
 
-    try:
-        field_types = get_type_hints(context.unstructure_as)
-    except NameError as exc:
-        raise UnstructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
+    def __call__(self, context: UnstructurerContext, val: Any) -> Any:
+        result = []
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
-    if not is_dataclass(context.unstructure_as):
-        raise UnstructuringError(
-            f"Expected a dataclass to structure into, got {context.unstructure_as}"
-        )
-    struct_fields = fields(context.unstructure_as)
-
-    for field in struct_fields:
         try:
-            result.append(
-                context.unstructurer.unstructure_as(
-                    field_types[field.name], getattr(val, field.name)
+            struct_fields = self._get_fields(context.unstructure_as)
+        except StructAdapterError as exc:
+            raise UnstructuringError(
+                f"Failed to fetch field metadata for the value `{val}`: {exc}"
+            ) from exc
+
+        for field in struct_fields:
+            try:
+                result.append(
+                    context.unstructurer.unstructure_as(field.type, getattr(val, field.name))
                 )
+            except UnstructuringError as exc:  # noqa: PERF203
+                exceptions.append((StructField(field.name), exc))
+
+        if exceptions:
+            raise UnstructuringError(
+                f"Failed to unstructure to a list as {context.unstructure_as}", exceptions
             )
-        except UnstructuringError as exc:  # noqa: PERF203
-            exceptions.append((StructField(field.name), exc))
 
-    if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+        return result
 
-    return result
+
+unstructure_dataclass_to_list = _UnstructureStructLikeToList(get_fields_dataclass)
+UnstructureDataclassToDict = partial(_UnstructureStructLikeToDict, get_fields_dataclass)
+
+unstructure_named_tuple_to_list = _UnstructureStructLikeToList(get_fields_named_tuple)
+UnstructureNamedTupleToDict = partial(_UnstructureStructLikeToDict, get_fields_named_tuple)

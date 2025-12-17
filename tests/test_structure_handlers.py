@@ -1,10 +1,10 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import UnionType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -229,7 +229,7 @@ def test_structure_list_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: structure_list_into_dataclass,
+            DataclassBase: structure_list_into_dataclass,
         },
     )
 
@@ -238,24 +238,28 @@ def test_structure_list_into_dataclass():
         x: int
         y: str
         z: str = "default"
+        w: str = field(default_factory=lambda: "other default")
 
-    assert structurer.structure_into(Container, [1, "a"]) == Container(x=1, y="a", z="default")
+    assert structurer.structure_into(Container, [1, "a"]) == Container(x=1, y="a")
     assert structurer.structure_into(Container, [1, "a", "b"]) == Container(x=1, y="a", z="b")
+    assert structurer.structure_into(Container, [1, "a", "b", "c"]) == Container(
+        x=1, y="a", z="b", w="c"
+    )
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "y": "a", "z": "b"})
-    expected = StructuringError("Can only structure a list into a dataclass")
+    expected = StructuringError("Can only structure a list into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, [1, "a", "b", 2])
+        structurer.structure_into(Container, [1, "a", "b", 2, 3])
     expected = StructuringError("Too many fields to serialize into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1])
     expected = StructuringError(
-        "Cannot structure a list into a dataclass",
+        "Failed to structure a list into",
         [(StructField("y"), StructuringError("Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -263,7 +267,7 @@ def test_structure_list_into_dataclass():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, 2, "a"])
     expected = StructuringError(
-        "Cannot structure a list into a dataclass",
+        "Failed to structure a list into",
         [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -277,32 +281,12 @@ def test_structure_list_into_dataclass_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
-        structurer.structure_into(str, ["1"])
-
-
-def test_structure_list_into_dataclass_hint_resolution():
-    structurer = Structurer(
-        {int: structure_into_int, Dataclass: structure_list_into_dataclass},
+    message = re.escape(
+        "Failed to fetch field metadata for the value `['1']`: "
+        "Expected a dataclass, got <class 'str'>"
     )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert structurer.structure_into(StringAnnotation, [1]) == StringAnnotation(x=1)
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        StructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        structurer.structure_into(UnresolvedAnnotation, [1])
+    with pytest.raises(StructuringError, match=message):
+        structurer.structure_into(str, ["1"])
 
 
 def test_structure_dict_into_dataclass():
@@ -310,8 +294,8 @@ def test_structure_dict_into_dataclass():
         {
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: StructureDictIntoDataclass(
-                name_converter=lambda name, _metadata: name + "_"
+            DataclassBase: StructureDictIntoDataclass(
+                name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
             ),
         },
     )
@@ -319,45 +303,51 @@ def test_structure_dict_into_dataclass():
     @dataclass
     class Container:
         x: int
-        y: str
+        y: str = field(metadata={"foo": True})
         z: str = "default"
+        w: str = field(default_factory=lambda: "other default")
 
-    assert structurer.structure_into(Container, {"x_": 1, "y_": "a"}) == Container(
-        x=1, y="a", z="default"
-    )
-    assert structurer.structure_into(Container, {"x_": 1, "y_": "a", "z_": "b"}) == Container(
+    assert structurer.structure_into(Container, {"x_": 1, "y": "a"}) == Container(x=1, y="a")
+    assert structurer.structure_into(Container, {"x_": 1, "y": "a", "z_": "b"}) == Container(
         x=1, y="a", z="b"
     )
+    assert structurer.structure_into(
+        Container, {"x_": 1, "y": "a", "z_": "b", "w_": "c"}
+    ) == Container(x=1, y="a", z="b", w="c")
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b"])
-    expected = StructuringError("Can only structure a dictionary into a dataclass")
+    expected = StructuringError("Can only structure a dictionary into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, {"x_": 1, "z_": "b"})
+        structurer.structure_into(Container, {"y": "a", "z_": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
-        [(StructField("y"), StructuringError(r"Missing field \(`y_` in the input\)"))],
+        "Failed to structure a dict into",
+        [(StructField("x"), StructuringError(r"Missing field \(`x_` in the input\)"))],
     )
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
-        structurer.structure_into(Container, {"x_": 1, "y_": 2, "z_": "b"})
+        structurer.structure_into(Container, {"x_": 1, "y": 2, "z_": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
 
     # Need a structurer without a name converter for this one
     structurer = Structurer(
-        {int: structure_into_int, str: structure_into_str, Dataclass: StructureDictIntoDataclass()},
+        {
+            int: structure_into_int,
+            str: structure_into_str,
+            DataclassBase: StructureDictIntoDataclass(),
+        },
     )
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "z": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [(StructField("y"), StructuringError(r"Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -371,29 +361,9 @@ def test_structure_dict_into_dataclass_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
-        structurer.structure_into(str, {"a": "1"})
-
-
-def test_structure_dict_into_dataclass_hint_resolution():
-    structurer = Structurer(
-        {int: structure_into_int, Dataclass: StructureDictIntoDataclass()},
+    message = re.escape(
+        "Failed to fetch field metadata for the value `{'a': '1'}`: "
+        "Expected a dataclass, got <class 'str'>"
     )
-
-    @dataclass
-    class StringAnnotation:
-        x: "int"
-
-    assert structurer.structure_into(StringAnnotation, {"x": 1}) == StringAnnotation(x=1)
-
-    @dataclass
-    class UnresolvedAnnotation:
-        x: "int2"  # noqa: F821
-
-    with pytest.raises(
-        StructuringError,
-        match="Field type annotation cannot be resolved: name 'int2' is not defined",
-    ):
-        structurer.structure_into(UnresolvedAnnotation, {"x": 1})
+    with pytest.raises(StructuringError, match=message):
+        structurer.structure_into(str, {"a": "1"})

@@ -5,7 +5,7 @@ from typing import NewType
 
 import pytest
 from compages import (
-    Dataclass,
+    DataclassBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -71,7 +71,7 @@ def test_structure_routing():
             HexInt: structure_hex_int,
             list[int]: structure_custom_generic,
             list: structure_into_list,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 
@@ -101,7 +101,7 @@ def test_structure_generators():
         {
             int: structure_into_int,
             Container: structure_container,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 
@@ -121,7 +121,7 @@ def test_structure_no_finalizing_handler():
         new_val = yield val
         return new_val
 
-    structurer = Structurer({Dataclass: my_structure_dataclass})
+    structurer = Structurer({DataclassBase: my_structure_dataclass})
 
     with pytest.raises(
         StructuringError, match="Could not find a non-generator handler to structure into"
@@ -157,7 +157,7 @@ def test_error_rendering():
             dict: structure_into_dict,
             int: structure_into_int,
             str: structure_into_str,
-            Dataclass: StructureDictIntoDataclass(),
+            DataclassBase: StructureDictIntoDataclass(),
         }
     )
 
@@ -165,13 +165,13 @@ def test_error_rendering():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Outer, data)
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [
             (StructField("x"), StructuringError("The value must be an integer")),
             (
                 StructField("y"),
                 StructuringError(
-                    "Cannot structure a dict into a dataclass",
+                    "Failed to structure a dict into",
                     [
                         (
                             StructField("u"),
@@ -218,9 +218,9 @@ def test_error_rendering():
     assert_exception_matches(exc.value, expected)
 
     exc_str = """
-Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Outer'>
+Failed to structure a dict into <class 'test_structure.test_error_rendering.<locals>.Outer'>
   x: The value must be an integer
-  y: Cannot structure a dict into a dataclass <class 'test_structure.test_error_rendering.<locals>.Inner'>
+  y: Failed to structure a dict into <class 'test_structure.test_error_rendering.<locals>.Inner'>
     y.u: Cannot structure into int | str
       y.u.<int>: The value must be an integer
       y.u.<str>: The value must be a string
@@ -229,6 +229,6 @@ Cannot structure a dict into a dataclass <class 'test_structure.test_error_rende
       y.d.[1]: The value must be a string
     y.lst: Cannot structure into list[int]
       y.lst.[1]: The value must be an integer
-""".strip()  # noqa: E501
+""".strip()
 
     assert str(exc.value) == exc_str

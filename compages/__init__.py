@@ -1,4 +1,4 @@
-from ._common import Dataclass
+from ._common import DataclassBase, NamedTupleBase
 from ._structure import (
     Structurer,
     StructurerContext,
@@ -6,6 +6,7 @@ from ._structure import (
 )
 from ._structure_handlers import (
     StructureDictIntoDataclass,
+    StructureDictIntoNamedTuple,
     simple_structure,
     structure_into_bool,
     structure_into_bytes,
@@ -18,6 +19,7 @@ from ._structure_handlers import (
     structure_into_tuple,
     structure_into_union,
     structure_list_into_dataclass,
+    structure_list_into_named_tuple,
 )
 from ._unstructure import (
     Unstructurer,
@@ -26,6 +28,7 @@ from ._unstructure import (
 )
 from ._unstructure_handlers import (
     UnstructureDataclassToDict,
+    UnstructureNamedTupleToDict,
     simple_typechecked_unstructure,
     simple_unstructure,
     unstructure_as_bool,
@@ -39,15 +42,19 @@ from ._unstructure_handlers import (
     unstructure_as_tuple,
     unstructure_as_union,
     unstructure_dataclass_to_list,
+    unstructure_named_tuple_to_list,
 )
 
 __all__ = [
-    "Dataclass",
+    "DataclassBase",
+    "NamedTupleBase",
     "StructureDictIntoDataclass",
+    "StructureDictIntoNamedTuple",
     "Structurer",
     "StructurerContext",
     "StructuringError",
     "UnstructureDataclassToDict",
+    "UnstructureNamedTupleToDict",
     "Unstructurer",
     "UnstructurerContext",
     "UnstructuringError",
@@ -65,6 +72,7 @@ __all__ = [
     "structure_into_tuple",
     "structure_into_union",
     "structure_list_into_dataclass",
+    "structure_list_into_named_tuple",
     "unstructure_as_bool",
     "unstructure_as_bytes",
     "unstructure_as_dict",
@@ -76,4 +84,5 @@ __all__ = [
     "unstructure_as_tuple",
     "unstructure_as_union",
     "unstructure_dataclass_to_list",
+    "unstructure_named_tuple_to_list",
 ]

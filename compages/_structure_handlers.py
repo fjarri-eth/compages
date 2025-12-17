@@ -1,9 +1,16 @@
 from collections.abc import Callable
-from dataclasses import MISSING, fields, is_dataclass
-from functools import wraps
+from functools import partial, wraps
 from types import MappingProxyType
-from typing import Any, get_args, get_type_hints
+from typing import Any, get_args
 
+from ._common import ExtendedType
+from ._struct_like import (
+    Field,
+    NoDefault,
+    StructAdapterError,
+    get_fields_dataclass,
+    get_fields_named_tuple,
+)
 from ._structure import StructurerContext, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
@@ -158,85 +165,85 @@ def structure_into_dict(context: StructurerContext, val: Any) -> Any:
     return result
 
 
-def structure_list_into_dataclass(context: StructurerContext, val: Any) -> Any:
-    if not isinstance(val, list):
-        raise StructuringError("Can only structure a list into a dataclass")
-
-    results = {}
-    exceptions: list[tuple[PathElem, StructuringError]] = []
-
-    if not is_dataclass(context.structure_into):
-        raise StructuringError(
-            f"Expected a dataclass to structure into, got {context.structure_into}"
-        )
-    struct_fields = fields(context.structure_into)
-
-    try:
-        field_types = get_type_hints(context.structure_into)
-    except NameError as exc:
-        raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
-
-    if len(val) > len(struct_fields):
-        raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
-
-    for i, field in enumerate(struct_fields):
-        if i < len(val):
-            try:
-                results[field.name] = context.structurer.structure_into(
-                    field_types[field.name], val[i]
-                )
-            except StructuringError as exc:
-                exceptions.append((StructField(field.name), exc))
-        elif field.default is not MISSING:
-            results[field.name] = field.default
-        else:
-            exceptions.append((StructField(field.name), StructuringError("Missing field")))
-
-    if exceptions:
-        raise StructuringError(
-            f"Cannot structure a list into a dataclass {context.structure_into}", exceptions
-        )
-
-    return context.structure_into(**results)
-
-
-class StructureDictIntoDataclass:
+class _StructureListIntoStructLike:
     def __init__(
         self,
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
+        get_fields: Callable[[ExtendedType[Any]], list[Field]],
     ):
-        self._name_converter = name_converter
+        self._get_fields = get_fields
 
     def __call__(self, context: StructurerContext, val: Any) -> Any:
-        if not isinstance(val, dict):
-            raise StructuringError("Can only structure a dictionary into a dataclass")
+        if not isinstance(val, list):
+            raise StructuringError(f"Can only structure a list into {context.structure_into}")
 
         results = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []
 
         try:
-            field_types = get_type_hints(context.structure_into)
-        except NameError as exc:
-            raise StructuringError(f"Field type annotation cannot be resolved: {exc}") from exc
-
-        if not is_dataclass(context.structure_into):
+            struct_fields = self._get_fields(context.structure_into)
+        except StructAdapterError as exc:
             raise StructuringError(
-                f"Expected a dataclass to structure into, got {context.structure_into}"
+                f"Failed to fetch field metadata for the value `{val}`: {exc}"
+            ) from exc
+
+        if len(val) > len(struct_fields):
+            raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
+
+        for i, field in enumerate(struct_fields):
+            if i < len(val):
+                try:
+                    results[field.name] = context.structurer.structure_into(field.type, val[i])
+                except StructuringError as exc:
+                    exceptions.append((StructField(field.name), exc))
+            elif field.default is not NoDefault:
+                results[field.name] = field.default
+            else:
+                exceptions.append((StructField(field.name), StructuringError("Missing field")))
+
+        if exceptions:
+            raise StructuringError(
+                f"Failed to structure a list into a dataclass {context.structure_into}", exceptions
             )
-        struct_fields = fields(context.structure_into)
+
+        return context.structure_into(**results)
+
+
+class _StructureDictIntoStructLike:
+    def __init__(
+        self,
+        get_fields: Callable[[ExtendedType[Any]], list[Field]],
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
+        self._get_fields = get_fields
+        self._name_converter = name_converter
+
+    def __call__(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, dict):
+            raise StructuringError(f"Can only structure a dictionary into {context.structure_into}")
+
+        results = {}
+        exceptions: list[tuple[PathElem, StructuringError]] = []
+
+        try:
+            struct_fields = self._get_fields(context.structure_into)
+        except StructAdapterError as exc:
+            raise StructuringError(
+                f"Failed to fetch field metadata for the value `{val}`: {exc}"
+            ) from exc
 
         for field in struct_fields:
             val_name = self._name_converter(field.name, field.metadata)
             if val_name in val:
                 try:
                     results[field.name] = context.structurer.structure_into(
-                        field_types[field.name], val[val_name]
+                        field.type, val[val_name]
                     )
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
-            elif field.default is not MISSING:
+            elif field.default is not NoDefault:
                 results[field.name] = field.default
+            # TODO: support default factory
             else:
                 if val_name == field.name:
                     message = "Missing field"
@@ -246,7 +253,14 @@ class StructureDictIntoDataclass:
 
         if exceptions:
             raise StructuringError(
-                f"Cannot structure a dict into a dataclass {context.structure_into}", exceptions
+                f"Failed to structure a dict into {context.structure_into}", exceptions
             )
 
         return context.structure_into(**results)
+
+
+structure_list_into_dataclass = _StructureListIntoStructLike(get_fields_dataclass)
+StructureDictIntoDataclass = partial(_StructureDictIntoStructLike, get_fields_dataclass)
+
+structure_list_into_named_tuple = _StructureListIntoStructLike(get_fields_named_tuple)
+StructureDictIntoNamedTuple = partial(_StructureDictIntoStructLike, get_fields_named_tuple)

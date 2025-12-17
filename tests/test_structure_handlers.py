@@ -1,10 +1,12 @@
 import re
 from dataclasses import dataclass
 from types import UnionType
+from typing import NamedTuple
 
 import pytest
 from compages import (
     Dataclass,
+    NamedTupleBase,
     StructureDictIntoDataclass,
     Structurer,
     StructuringError,
@@ -244,7 +246,7 @@ def test_structure_list_into_dataclass():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "y": "a", "z": "b"})
-    expected = StructuringError("Can only structure a list into a dataclass")
+    expected = StructuringError("Can only structure a list into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -255,7 +257,7 @@ def test_structure_list_into_dataclass():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1])
     expected = StructuringError(
-        "Cannot structure a list into a dataclass",
+        "Failed to structure a list into",
         [(StructField("y"), StructuringError("Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -263,7 +265,7 @@ def test_structure_list_into_dataclass():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, 2, "a"])
     expected = StructuringError(
-        "Cannot structure a list into a dataclass",
+        "Failed to structure a list into",
         [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -277,9 +279,11 @@ def test_structure_list_into_dataclass_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
+    message = re.escape(
+        "Failed to fetch field metadata for the value `['1']`: "
+        "Expected a dataclass, got <class 'str'>"
+    )
+    with pytest.raises(StructuringError, match=message):
         structurer.structure_into(str, ["1"])
 
 
@@ -331,13 +335,13 @@ def test_structure_dict_into_dataclass():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, [1, "a", "b"])
-    expected = StructuringError("Can only structure a dictionary into a dataclass")
+    expected = StructuringError("Can only structure a dictionary into")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x_": 1, "z_": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [(StructField("y"), StructuringError(r"Missing field \(`y_` in the input\)"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -345,7 +349,7 @@ def test_structure_dict_into_dataclass():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x_": 1, "y_": 2, "z_": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [(StructField("y"), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -357,7 +361,7 @@ def test_structure_dict_into_dataclass():
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(Container, {"x": 1, "z": "b"})
     expected = StructuringError(
-        "Cannot structure a dict into a dataclass",
+        "Failed to structure a dict into",
         [(StructField("y"), StructuringError(r"Missing field"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -371,9 +375,11 @@ def test_structure_dict_into_dataclass_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        StructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
+    message = re.escape(
+        "Failed to fetch field metadata for the value `{'a': '1'}`: "
+        "Expected a dataclass, got <class 'str'>"
+    )
+    with pytest.raises(StructuringError, match=message):
         structurer.structure_into(str, {"a": "1"})
 
 

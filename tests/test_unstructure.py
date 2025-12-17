@@ -159,13 +159,13 @@ def test_error_rendering():
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Outer, data)
     expected = UnstructuringError(
-        "Cannot unstructure as",
+        "Failed to unstructure to a dict as",
         [
             (StructField("x"), UnstructuringError("The value must be of type `int`")),
             (
                 StructField("y"),
                 UnstructuringError(
-                    "Cannot unstructure as",
+                    "Failed to unstructure to a dict as",
                     [
                         (
                             StructField("u"),
@@ -220,9 +220,9 @@ def test_error_rendering():
     assert_exception_matches(exc.value, expected)
 
     exc_str = """
-Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Outer'>
+Failed to unstructure to a dict as <class 'test_unstructure.test_error_rendering.<locals>.Outer'>
   x: The value must be of type `int`
-  y: Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Inner'>
+  y: Failed to unstructure to a dict as <class 'test_unstructure.test_error_rendering.<locals>.Inner'>
     y.u: Cannot unstructure as int | str
       y.u.<int>: The value must be of type `int`
       y.u.<str>: The value must be of type `str`
@@ -231,6 +231,6 @@ Cannot unstructure as <class 'test_unstructure.test_error_rendering.<locals>.Out
       y.d.[1]: The value must be of type `str`
     y.lst: Cannot unstructure as list[int]
       y.lst.[1]: The value must be of type `int`
-""".strip()
+""".strip()  # noqa: E501
 
     assert str(exc.value) == exc_str

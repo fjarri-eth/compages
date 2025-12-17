@@ -1,4 +1,4 @@
-from ._common import Dataclass
+from ._common import Dataclass, NamedTupleBase
 from ._structure import (
     Structurer,
     StructurerContext,
@@ -43,6 +43,7 @@ from ._unstructure_handlers import (
 
 __all__ = [
     "Dataclass",
+    "NamedTupleBase",
     "StructureDictIntoDataclass",
     "Structurer",
     "StructurerContext",

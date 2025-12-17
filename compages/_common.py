@@ -105,6 +105,17 @@ class Dataclass:
     pass
 
 
+class NamedTupleBase:
+    pass
+
+
+def is_named_tuple(tp: ExtendedType[Any]) -> bool:
+    # There is no analogue of `is_dataclass()` for named tuples, so we have to write our own.
+    # After Py3.12 there is `types.get_original_bases()` which should help.
+    # Note: check that it works both for `collections.namedtuple` and `typing.NamedTuple`.
+    return isinstance(tp, type) and issubclass(tp, tuple) and hasattr(tp, "_fields")
+
+
 def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     """
     Returns the structuring/unstructuring handler lookup order for regular types, generic types,
@@ -137,6 +148,12 @@ def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
 
         if is_dataclass(tp):
             mro.append(Dataclass)
+
+        if is_named_tuple(tp):
+            # Add the marker in front of `tuple` (which will be present in the MRO),
+            # so that the `NamedTuple` handler would trigger before the handlers
+            # attached to `tuple`.
+            mro.insert(mro.index(tuple), NamedTupleBase)
 
         # Can cast here since all the elements will be isntances of `type`.
         return cast("list[ExtendedType[Any]]", mro)

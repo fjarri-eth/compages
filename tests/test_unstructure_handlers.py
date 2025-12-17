@@ -269,7 +269,7 @@ def test_unstructure_dataclass_to_dict():
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
-        "Cannot unstructure as",
+        "Failed to unstructure to a dict as",
         [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -283,9 +283,10 @@ def test_unstructure_dataclass_to_dict_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
+    message = (
+        "Failed to fetch field metadata for the value `1`: Expected a dataclass, got <class 'str'>"
+    )
+    with pytest.raises(UnstructuringError, match=message):
         unstructurer.unstructure_as(str, "1")
 
 
@@ -386,7 +387,7 @@ def test_unstructure_dataclass_to_list():
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Container, Container(x=1, y=2, z="b"))
     expected = UnstructuringError(
-        "Cannot unstructure as",
+        "Failed to unstructure to a list as",
         [(StructField("y"), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
@@ -400,9 +401,10 @@ def test_unstructure_dataclass_to_list_invalid_handler():
         },
     )
 
-    with pytest.raises(
-        UnstructuringError, match="Expected a dataclass to structure into, got <class 'str'>"
-    ):
+    message = (
+        "Failed to fetch field metadata for the value `1`: Expected a dataclass, got <class 'str'>"
+    )
+    with pytest.raises(UnstructuringError, match=message):
         unstructurer.unstructure_as(str, "1")
 
 

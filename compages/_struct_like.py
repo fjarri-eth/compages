@@ -20,6 +20,13 @@ class Field(NamedTuple):
     default_factory: None | Callable[[], Any] = None
     metadata: Any = None
 
+    def get_default(self) -> Any:
+        if self.default is not NoDefault:
+            return self.default
+        if self.default_factory is not None:
+            return self.default_factory()
+        return NoDefault
+
 
 def get_fields_named_tuple(tp: ExtendedType[Any]) -> list[Field]:
     try:
@@ -82,3 +89,9 @@ def get_fields_dataclass(tp: ExtendedType[Any]) -> list[Field]:
         )
 
     return fields
+
+
+class StructLikeOptions(NamedTuple):
+    to_unstructured_name: Callable[[str, Any], str] = lambda name, _metadata: name
+    unstructure_skip_defaults: bool = True
+    structure_fill_in_defaults: bool = True

@@ -1,7 +1,7 @@
 from collections.abc import Callable, Generator
 from dataclasses import is_dataclass
 from enum import Enum
-from types import GeneratorType
+from types import GeneratorType, UnionType
 from typing import (
     Any,
     Generic,
@@ -9,6 +9,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    Union,
     cast,
     get_origin,
     runtime_checkable,
@@ -94,6 +95,8 @@ class TypedNewType(Protocol, Generic[_T_co]):
 
     __supertype__: "type[Any] | TypedNewType[Any]"
 
+    __name__: str
+
 
 _T = TypeVar("_T")
 
@@ -116,6 +119,43 @@ def is_named_tuple(tp: ExtendedType[Any]) -> bool:
     return isinstance(tp, type) and issubclass(tp, tuple) and hasattr(tp, "_fields")
 
 
+def isinstance_ext(val: Any, lookup_order: list[ExtendedType[Any]]) -> bool:
+    """
+    An extended `isinstance` working with newtypes and generic types.
+
+    Instead of an actual type `tp` takes the return value of `get_lookup_order(tp)`
+    (for performance reasons).
+
+    If `tp` is a regular type, returns `isinstance(val, tp)`.
+
+    If `tp` is a `NewType`, returns `isinstance(val, base_tp)` where `base_tp`
+    is the first regular supertype of the newtype hierarchy.
+
+    If `tp` is a generic, `isinstance_ext` **does not** attempt to introspect the value
+    (not that it has any means to, at this level),
+    only checking for `isinstance()` with the origin.
+    That is, `isinstance_ext(val, list[int]) == isinstance(val, list)`,
+    regardless of what type the elements of `val` are
+    (checking that is the responsibility of handlers).
+
+    As a corollary or that, `isinstance_ext(val, UnionType[...])` is always `True`.
+    """
+    for tp in lookup_order:
+        if tp is UnionType:
+            return True
+        # Mypy doesn't like it, but that's how Python works.
+        if tp is Union:  # type: ignore[comparison-overlap]
+            return True
+        if isinstance(tp, type) and get_origin(tp) is None:
+            return isinstance(val, tp)
+
+    # There must be at least one regular type in the lookup order.
+    raise RuntimeError(  # pragma: no cover
+        f"This is supposed to be unreachable. "
+        f"Value was {val} and its lookup order was {lookup_order}"
+    )
+
+
 def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
     """
     Returns the structuring/unstructuring handler lookup order for regular types, generic types,
@@ -128,6 +168,8 @@ def get_lookup_order(tp: ExtendedType[Any]) -> list[ExtendedType[Any]]:
       ``tp.__supertype__``.
     - For a generic (something with a non-``None`` ``typing.get_origin()``),
       the order is ``tp`` followed by the lookup order for the origin.
+    - For a dataclass, a ``DataclassBase`` marker type is appended to the end of the returned list.
+    - For a named tuple, a ``NamedTupleBase`` marker type is inserted just before ``tuple``.
 
     .. note::
 

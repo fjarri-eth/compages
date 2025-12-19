@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping
 from typing import Any, NamedTuple, TypeVar
 
-from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
+from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order, isinstance_ext
 from .path import PathElem
 
 
@@ -42,6 +42,26 @@ class UnstructurerContext(NamedTuple):
     unstructure_as: ExtendedType[Any]
 
 
+class UnstructureHandler:
+    def unstructure(
+        self,
+        context: UnstructurerContext,  # noqa: ARG002
+        value: Any,
+    ) -> Any:
+        """
+        Unstructures (serializes) the given ``value`` given ``context``.
+
+        It is guaranteed that
+        ``isinstance_ext(val, get_lookup_order(context.unstructure_as)) == True``.
+        """
+        return self.simple_unstructure(value)
+
+    def simple_unstructure(self, value: Any) -> Any:
+        raise NotImplementedError(
+            "`UnstructureHandler` must implement either `unstructure()` or `simple_unstructure()`"
+        )
+
+
 class Unstructurer:
     def __init__(
         self,
@@ -50,13 +70,21 @@ class Unstructurer:
         self._handlers = dict(handlers)
 
     def unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+        lookup_order = get_lookup_order(unstructure_as)
+
+        # We need this check to allow `Union` unstructuring to work
+        # (otherwise this check would have to be implemented manually in all handlers).
+        if not isinstance_ext(val, lookup_order):
+            # Note that `UnionType` does not have `__name__` (for whatever reason),
+            # but it always passes `isinstance_ext()`, so it won't appear in this branch.
+            raise UnstructuringError(f"The value must be of type `{unstructure_as.__name__}`")
+
         context = UnstructurerContext(unstructurer=self, unstructure_as=unstructure_as)
         stack = GeneratorStack[UnstructurerContext, Any](context, val)
-        lookup_order = get_lookup_order(unstructure_as)
 
         for tp in lookup_order:
             handler = self._handlers.get(tp, None)
-            result = stack.push(handler)
+            result = stack.push(handler.unstructure if handler else None)
             if result is not Result.UNDEFINED:
                 return result
 

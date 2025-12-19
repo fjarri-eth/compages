@@ -6,15 +6,15 @@ from typing import NewType
 import pytest
 from compages import (
     DataclassBase,
-    StructureMappingIntoDataclass,
+    IntoDataclassFromMapping,
+    IntoDict,
+    IntoInt,
+    IntoList,
+    IntoStr,
+    IntoUnion,
+    StructureHandler,
     Structurer,
     StructuringError,
-    simple_structure,
-    structure_into_dict,
-    structure_into_int,
-    structure_into_list,
-    structure_into_str,
-    structure_into_union,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -24,11 +24,11 @@ HexInt = NewType("HexInt", int)
 OtherInt = NewType("OtherInt", int)
 
 
-@simple_structure
-def structure_hex_int(val):
-    if not isinstance(val, str) or not val.startswith("0x"):
-        raise StructuringError("The value must be a hex-encoded integer")
-    return int(val, 0)
+class HexIntoInt(StructureHandler):
+    def simple_structure(self, val):
+        if not isinstance(val, str) or not val.startswith("0x"):
+            raise StructuringError("The value must be a hex-encoded integer")
+        return int(val, 0)
 
 
 # TODO (#5): duplicate
@@ -59,19 +59,19 @@ def test_structure_routing():
         # will have a specific `list[int]` handler, which takes priority over the generic `list` one
         custom_generic: list[int]
 
-    @simple_structure
-    def structure_custom_generic(val):
-        assert isinstance(val, list)
-        assert all(isinstance(elem, int) for elem in val)
-        return val
+    class AllIntsListIntoSelf(StructureHandler):
+        def simple_structure(self, val):
+            assert isinstance(val, list)
+            assert all(isinstance(elem, int) for elem in val)
+            return val
 
     structurer = Structurer(
         {
-            int: structure_into_int,
-            HexInt: structure_hex_int,
-            list[int]: structure_custom_generic,
-            list: structure_into_list,
-            DataclassBase: StructureMappingIntoDataclass(),
+            int: IntoInt(),
+            HexInt: HexIntoInt(),
+            list[int]: AllIntsListIntoSelf(),
+            list: IntoList(),
+            DataclassBase: IntoDataclassFromMapping(),
         }
     )
 
@@ -91,17 +91,17 @@ def test_structure_generators():
     class Container:
         x: int
 
-    @simple_structure
-    def structure_container(val):
-        to_lower_level = {"x": val["x"] + 10}
-        from_lower_level = yield to_lower_level
-        return Container(x=from_lower_level.x * 2)
+    class IntoContainer(StructureHandler):
+        def simple_structure(self, val):
+            to_lower_level = {"x": val["x"] + 10}
+            from_lower_level = yield to_lower_level
+            return Container(x=from_lower_level.x * 2)
 
     structurer = Structurer(
         {
-            int: structure_into_int,
-            Container: structure_container,
-            DataclassBase: StructureMappingIntoDataclass(),
+            int: IntoInt(),
+            Container: IntoContainer(),
+            DataclassBase: IntoDataclassFromMapping(),
         }
     )
 
@@ -117,11 +117,12 @@ def test_structure_no_finalizing_handler():
     class Container:
         x: int
 
-    def my_structure_dataclass(_context, val):
-        new_val = yield val
-        return new_val
+    class PassThrough(StructureHandler):
+        def structure(self, _context, val):
+            new_val = yield val
+            return new_val
 
-    structurer = Structurer({DataclassBase: my_structure_dataclass})
+    structurer = Structurer({DataclassBase: PassThrough()})
 
     with pytest.raises(
         StructuringError, match="Could not find a non-generator handler to structure into"
@@ -138,6 +139,19 @@ def test_structure_routing_handler_not_found():
     assert_exception_matches(exc.value, expected)
 
 
+def test_structure_handler_fallback():
+    class Foo(StructureHandler):
+        pass
+
+    structurer = Structurer({int: Foo()})
+
+    message = re.escape(
+        "`StructureHandler` must implement either `structure()` or `simple_structure()`"
+    )
+    with pytest.raises(NotImplementedError, match=message) as exc:
+        structurer.structure_into(int, 1)
+
+
 def test_error_rendering():
     @dataclass
     class Inner:
@@ -152,12 +166,12 @@ def test_error_rendering():
 
     structurer = Structurer(
         {
-            UnionType: structure_into_union,
-            list: structure_into_list,
-            dict: structure_into_dict,
-            int: structure_into_int,
-            str: structure_into_str,
-            DataclassBase: StructureMappingIntoDataclass(),
+            UnionType: IntoUnion(),
+            list: IntoList(),
+            dict: IntoDict(),
+            int: IntoInt(),
+            str: IntoStr(),
+            DataclassBase: IntoDataclassFromMapping(),
         }
     )
 

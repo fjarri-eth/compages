@@ -1,9 +1,8 @@
 from collections.abc import Callable, Mapping, Sequence
-from functools import partial, wraps
 from types import MappingProxyType
 from typing import Any, get_args
 
-from ._common import ExtendedType, TypedNewType
+from ._common import ExtendedType
 from ._struct_like import (
     Field,
     NoDefault,
@@ -12,174 +11,151 @@ from ._struct_like import (
     get_fields_named_tuple,
 )
 from ._unstructure import (
+    UnstructureHandler,
     UnstructurerContext,
     UnstructuringError,
 )
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_unstructure(func: Callable[[Any], Any]) -> Callable[[UnstructurerContext, Any], Any]:
-    @wraps(func)
-    def _wrapped(_context: UnstructurerContext, val: Any) -> Any:
-        return func(val)
-
-    return _wrapped
+class AsNone(UnstructureHandler):
+    def simple_unstructure(self, _val: None) -> None:
+        pass
 
 
-def simple_typechecked_unstructure(
-    func: Callable[[Any], Any],
-) -> Callable[[UnstructurerContext, Any], Any]:
-    @wraps(func)
-    def _wrapped(context: UnstructurerContext, val: Any) -> Any:
-        if isinstance(context.unstructure_as, TypedNewType):
-            base_type = context.unstructure_as.__supertype__
-            # `NewType`'s `__supertype__` can be another newtype,
-            # so we have to follow the chain until we reach something that's not a `NewType`.
-            while isinstance(base_type, TypedNewType):
-                base_type = base_type.__supertype__
-            if not isinstance(val, base_type):
-                raise UnstructuringError(f"The value must be of type `{base_type.__name__}`")
-        elif not isinstance(val, context.unstructure_as):
+class AsInt(UnstructureHandler):
+    def simple_unstructure(self, val: int) -> int:
+        # Handling a special case of `bool` here since in Python `bool` is an `int`,
+        # and we don't want to mix them up.
+        if isinstance(val, bool):
+            raise UnstructuringError("The value must be of type `int`")
+        return int(val)
+
+
+class AsFloat(UnstructureHandler):
+    def simple_unstructure(self, val: float) -> float:
+        return float(val)
+
+
+class AsBool(UnstructureHandler):
+    def simple_unstructure(self, val: bool) -> bool:  # noqa: FBT001
+        return bool(val)
+
+
+class AsBytes(UnstructureHandler):
+    def simple_unstructure(self, val: bytes) -> bytes:
+        return bytes(val)
+
+
+class AsStr(UnstructureHandler):
+    def simple_unstructure(self, val: str) -> str:
+        return str(val)
+
+
+class AsUnion(UnstructureHandler):
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        variants = get_args(context.unstructure_as)
+
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
+        for variant in variants:
+            try:
+                return context.unstructurer.unstructure_as(variant, val)
+            except UnstructuringError as exc:  # noqa: PERF203
+                exceptions.append((UnionVariant(variant), exc))
+
+        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+
+
+class AsTuple(UnstructureHandler):
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        if not isinstance(val, Sequence):
+            raise UnstructuringError("Can only unstructure a Sequence as a tuple")
+
+        elem_types = get_args(context.unstructure_as)
+
+        # Homogeneous tuples (tuple[some_type, ...])
+        if len(elem_types) == 2 and elem_types[1] == ...:
+            elem_types = tuple(elem_types[0] for _ in range(len(val)))
+
+        if len(val) < len(elem_types):
             raise UnstructuringError(
-                f"The value must be of type `{context.unstructure_as.__name__}`"
+                f"Not enough elements to unstructure as a tuple: "
+                f"got {len(val)}, need {len(elem_types)}"
             )
-        return func(val)
+        if len(val) > len(elem_types):
+            raise UnstructuringError(
+                f"Too many elements to unstructure as a tuple: "
+                f"got {len(val)}, need {len(elem_types)}"
+            )
 
-    return _wrapped
+        result = []
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
+        for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
+            try:
+                result.append(context.unstructurer.unstructure_as(tp, item))
+            except UnstructuringError as exc:  # noqa: PERF203
+                exceptions.append((ListElem(index), exc))
 
+        if exceptions:
+            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
 
-@simple_typechecked_unstructure
-def unstructure_as_none(_val: None) -> None:
-    pass
-
-
-@simple_typechecked_unstructure
-def unstructure_as_int(val: int) -> int:
-    # Handling a special case of `bool` here since in Python `bool` is an `int`,
-    # and we don't want to mix them up.
-    if isinstance(val, bool):
-        raise UnstructuringError("The value must be of type `int`")
-    return int(val)
-
-
-@simple_typechecked_unstructure
-def unstructure_as_float(val: float) -> float:
-    return float(val)
+        return result
 
 
-@simple_typechecked_unstructure
-def unstructure_as_bool(val: bool) -> bool:  # noqa: FBT001
-    return bool(val)
+class AsDict(UnstructureHandler):
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        if not isinstance(val, Mapping):
+            raise UnstructuringError("Can only unstructure a Mapping as a dict")
+
+        key_type, value_type = get_args(context.unstructure_as)
+
+        result = {}
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
+        for key, value in val.items():
+            success = True
+            try:
+                unstructured_key = context.unstructurer.unstructure_as(key_type, key)
+            except UnstructuringError as exc:
+                success = False
+                exceptions.append((DictKey(key), exc))
+
+            try:
+                unstructured_value = context.unstructurer.unstructure_as(value_type, value)
+            except UnstructuringError as exc:
+                success = False
+                exceptions.append((DictValue(key), exc))
+
+            if success:
+                result[unstructured_key] = unstructured_value
+
+        if exceptions:
+            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+
+        return result
 
 
-@simple_typechecked_unstructure
-def unstructure_as_bytes(val: bytes) -> bytes:
-    return bytes(val)
+class AsList(UnstructureHandler):
+    def unstructure(self, context: UnstructurerContext, val: list[Any]) -> Any:
+        if not isinstance(val, Sequence):
+            raise UnstructuringError("Can only unstructure a Sequence as a list")
+
+        (item_type,) = get_args(context.unstructure_as)
+
+        result = []
+        exceptions: list[tuple[PathElem, UnstructuringError]] = []
+        for index, item in enumerate(val):
+            try:
+                result.append(context.unstructurer.unstructure_as(item_type, item))
+            except UnstructuringError as exc:  # noqa: PERF203
+                exceptions.append((ListElem(index), exc))
+
+        if exceptions:
+            raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
+
+        return result
 
 
-@simple_typechecked_unstructure
-def unstructure_as_str(val: str) -> str:
-    return str(val)
-
-
-def unstructure_as_union(context: UnstructurerContext, val: Any) -> Any:
-    variants = get_args(context.unstructure_as)
-
-    exceptions: list[tuple[PathElem, UnstructuringError]] = []
-    for variant in variants:
-        try:
-            return context.unstructurer.unstructure_as(variant, val)
-        except UnstructuringError as exc:  # noqa: PERF203
-            exceptions.append((UnionVariant(variant), exc))
-
-    raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
-
-
-def unstructure_as_tuple(context: UnstructurerContext, val: Any) -> Any:
-    if not isinstance(val, Sequence):
-        raise UnstructuringError("Can only unstructure a Sequence as a tuple")
-
-    elem_types = get_args(context.unstructure_as)
-
-    # Homogeneous tuples (tuple[some_type, ...])
-    if len(elem_types) == 2 and elem_types[1] == ...:
-        elem_types = tuple(elem_types[0] for _ in range(len(val)))
-
-    if len(val) < len(elem_types):
-        raise UnstructuringError(
-            f"Not enough elements to unstructure as a tuple: got {len(val)}, need {len(elem_types)}"
-        )
-    if len(val) > len(elem_types):
-        raise UnstructuringError(
-            f"Too many elements to unstructure as a tuple: got {len(val)}, need {len(elem_types)}"
-        )
-
-    result = []
-    exceptions: list[tuple[PathElem, UnstructuringError]] = []
-    for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
-        try:
-            result.append(context.unstructurer.unstructure_as(tp, item))
-        except UnstructuringError as exc:  # noqa: PERF203
-            exceptions.append((ListElem(index), exc))
-
-    if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
-
-    return result
-
-
-def unstructure_as_dict(context: UnstructurerContext, val: Any) -> Any:
-    if not isinstance(val, Mapping):
-        raise UnstructuringError("Can only unstructure a Mapping as a dict")
-
-    key_type, value_type = get_args(context.unstructure_as)
-
-    result = {}
-    exceptions: list[tuple[PathElem, UnstructuringError]] = []
-    for key, value in val.items():
-        success = True
-        try:
-            unstructured_key = context.unstructurer.unstructure_as(key_type, key)
-        except UnstructuringError as exc:
-            success = False
-            exceptions.append((DictKey(key), exc))
-
-        try:
-            unstructured_value = context.unstructurer.unstructure_as(value_type, value)
-        except UnstructuringError as exc:
-            success = False
-            exceptions.append((DictValue(key), exc))
-
-        if success:
-            result[unstructured_key] = unstructured_value
-
-    if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
-
-    return result
-
-
-def unstructure_as_list(context: UnstructurerContext, val: list[Any]) -> Any:
-    if not isinstance(val, Sequence):
-        raise UnstructuringError("Can only unstructure a Sequence as a list")
-
-    (item_type,) = get_args(context.unstructure_as)
-
-    result = []
-    exceptions: list[tuple[PathElem, UnstructuringError]] = []
-    for index, item in enumerate(val):
-        try:
-            result.append(context.unstructurer.unstructure_as(item_type, item))
-        except UnstructuringError as exc:  # noqa: PERF203
-            exceptions.append((ListElem(index), exc))
-
-    if exceptions:
-        raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
-
-    return result
-
-
-class _UnstructureStructLikeToDict:
+class _AsStructLikeToDict(UnstructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
@@ -189,7 +165,7 @@ class _UnstructureStructLikeToDict:
         self._get_fields = get_fields
         self._name_converter = name_converter
 
-    def __call__(self, context: UnstructurerContext, val: Any) -> Any:
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         result = {}
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
@@ -225,14 +201,14 @@ class _UnstructureStructLikeToDict:
         return result
 
 
-class _UnstructureStructLikeToList:
+class _AsStructLikeToList(UnstructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
     ):
         self._get_fields = get_fields
 
-    def __call__(self, context: UnstructurerContext, val: Any) -> Any:
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         result = []
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
 
@@ -259,8 +235,41 @@ class _UnstructureStructLikeToList:
         return result
 
 
-unstructure_dataclass_to_list = _UnstructureStructLikeToList(get_fields_dataclass)
-UnstructureDataclassToDict = partial(_UnstructureStructLikeToDict, get_fields_dataclass)
+class AsDataclassToList(UnstructureHandler):
+    def __init__(self) -> None:
+        self._handler = _AsStructLikeToList(get_fields_dataclass)
 
-unstructure_named_tuple_to_list = _UnstructureStructLikeToList(get_fields_named_tuple)
-UnstructureNamedTupleToDict = partial(_UnstructureStructLikeToDict, get_fields_named_tuple)
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        return self._handler.unstructure(context, val)
+
+
+class AsDataclassToDict(UnstructureHandler):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
+        self._handler = _AsStructLikeToDict(get_fields_dataclass, name_converter=name_converter)
+
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        return self._handler.unstructure(context, val)
+
+
+class AsNamedTupleToList(UnstructureHandler):
+    def __init__(self) -> None:
+        self._handler = _AsStructLikeToList(get_fields_named_tuple)
+
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        return self._handler.unstructure(context, val)
+
+
+class AsNamedTupleToDict(UnstructureHandler):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
+        self._handler = _AsStructLikeToDict(get_fields_named_tuple, name_converter=name_converter)
+
+    def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
+        return self._handler.unstructure(context, val)

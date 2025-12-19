@@ -1,28 +1,30 @@
 import re
 from dataclasses import dataclass, field
 from types import UnionType
-from typing import NewType
+from typing import NamedTuple
 
 import pytest
 from compages import (
+    AsBool,
+    AsBytes,
+    AsDataclassToDict,
+    AsDataclassToList,
+    AsDict,
+    AsFloat,
+    AsInt,
+    AsList,
+    AsNamedTupleToDict,
+    AsNamedTupleToList,
+    AsNone,
+    AsStr,
+    AsTuple,
+    AsUnion,
     DataclassBase,
-    UnstructureDataclassToDict,
+    NamedTupleBase,
+    UnstructureHandler,
     Unstructurer,
     UnstructurerContext,
     UnstructuringError,
-    simple_typechecked_unstructure,
-    simple_unstructure,
-    unstructure_as_bool,
-    unstructure_as_bytes,
-    unstructure_as_dict,
-    unstructure_as_float,
-    unstructure_as_int,
-    unstructure_as_list,
-    unstructure_as_none,
-    unstructure_as_str,
-    unstructure_as_tuple,
-    unstructure_as_union,
-    unstructure_dataclass_to_list,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -39,85 +41,35 @@ def assert_exception_matches(exc, reference_exc):
         assert_exception_matches(inner_exc, ref_exc)
 
 
-def test_simple_typechecked_unstructure():
-    A = NewType("A", int)
-    B = NewType("B", A)
-
-    @simple_typechecked_unstructure
-    def unstructure_int(val):
-        return val
-
-    assert unstructure_int(UnstructurerContext(None, A), 1) == 1
-    assert unstructure_int(UnstructurerContext(None, B), 1) == 1
-    assert unstructure_int(UnstructurerContext(None, int), 1) == 1
-
-    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(UnstructurerContext(None, A), "a")
-    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(UnstructurerContext(None, B), "a")
-    with pytest.raises(UnstructuringError, match="The value must be of type `int`"):
-        unstructure_int(UnstructurerContext(None, int), "a")
-
-
 def test_unstructure_as_none():
-    unstructurer = Unstructurer({type(None): unstructure_as_none})
+    unstructurer = Unstructurer({type(None): AsNone()})
     assert unstructurer.unstructure_as(type(None), None) is None
-
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(type(None), 1)
-    expected = UnstructuringError("The value must be of type `NoneType`")
-    assert_exception_matches(exc.value, expected)
 
 
 def test_unstructure_as_float():
-    unstructurer = Unstructurer({float: unstructure_as_float})
+    unstructurer = Unstructurer({float: AsFloat()})
     assert unstructurer.unstructure_as(float, 1.5) == 1.5
-
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(float, "a")
-    expected = UnstructuringError("The value must be of type `float`")
-    assert_exception_matches(exc.value, expected)
 
 
 def test_unstructure_as_bool():
-    unstructurer = Unstructurer({bool: unstructure_as_bool})
+    unstructurer = Unstructurer({bool: AsBool()})
     assert unstructurer.unstructure_as(bool, True) is True
     assert unstructurer.unstructure_as(bool, False) is False
 
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(bool, "a")
-    expected = UnstructuringError("The value must be of type `bool`")
-    assert_exception_matches(exc.value, expected)
-
 
 def test_unstructure_as_str():
-    unstructurer = Unstructurer({str: unstructure_as_str})
+    unstructurer = Unstructurer({str: AsStr()})
     assert unstructurer.unstructure_as(str, "abc") == "abc"
-
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(str, 1)
-    expected = UnstructuringError("The value must be of type `str`")
-    assert_exception_matches(exc.value, expected)
 
 
 def test_unstructure_as_bytes():
-    unstructurer = Unstructurer({bytes: unstructure_as_bytes})
+    unstructurer = Unstructurer({bytes: AsBytes()})
     assert unstructurer.unstructure_as(bytes, b"abc") == b"abc"
-
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(bytes, 1)
-    expected = UnstructuringError("The value must be of type `bytes`")
-    assert_exception_matches(exc.value, expected)
 
 
 def test_unstructure_as_int():
-    unstructurer = Unstructurer({int: unstructure_as_int})
+    unstructurer = Unstructurer({int: AsInt()})
     assert unstructurer.unstructure_as(int, 1) == 1
-
-    with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(int, "a")
-    expected = UnstructuringError("The value must be of type `int`")
-    assert_exception_matches(exc.value, expected)
 
     # Specifically test that a boolean is not accepted,
     # even though it is a subclass of int in Python.
@@ -130,9 +82,9 @@ def test_unstructure_as_int():
 def test_unstructure_as_union():
     unstructurer = Unstructurer(
         {
-            UnionType: unstructure_as_union,
-            int: unstructure_as_int,
-            str: unstructure_as_str,
+            UnionType: AsUnion(),
+            int: AsInt(),
+            str: AsStr(),
         }
     )
     assert unstructurer.unstructure_as(int | str, "a") == "a"
@@ -153,34 +105,33 @@ def test_unstructure_as_union():
 def test_unstructure_as_tuple():
     unstructurer = Unstructurer(
         {
-            tuple: unstructure_as_tuple,
-            int: unstructure_as_int,
-            str: unstructure_as_str,
+            tuple: AsTuple(),
+            int: AsInt(),
+            str: AsStr(),
         }
     )
 
-    assert unstructurer.unstructure_as(tuple[()], []) == []
-    assert unstructurer.unstructure_as(tuple[int, str], [1, "a"]) == [1, "a"]
+    assert unstructurer.unstructure_as(tuple[()], ()) == []
     assert unstructurer.unstructure_as(tuple[int, str], (1, "a")) == [1, "a"]
     assert unstructurer.unstructure_as(tuple[int, ...], (1, 2, 3)) == [1, 2, 3]
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(tuple[int, str], {"x": 1, "y": "a"})
+        AsTuple().unstructure(UnstructurerContext(None, tuple[int, str]), {"x": 1, "y": "a"})
     expected = UnstructuringError("Can only unstructure a Sequence as a tuple")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(tuple[int, str, int], [1, "a"])
+        unstructurer.unstructure_as(tuple[int, str, int], (1, "a"))
     expected = UnstructuringError("Not enough elements to unstructure as a tuple: got 2, need 3")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(tuple[int], [1, "a"])
+        unstructurer.unstructure_as(tuple[int], (1, "a"))
     expected = UnstructuringError("Too many elements to unstructure as a tuple: got 2, need 1")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(tuple[int, str], [1, 1.2])
+        unstructurer.unstructure_as(tuple[int, str], (1, 1.2))
     expected = UnstructuringError(
         r"Cannot unstructure as tuple\[int, str\]",
         [(ListElem(1), UnstructuringError("The value must be of type `str`"))],
@@ -189,13 +140,12 @@ def test_unstructure_as_tuple():
 
 
 def test_unstructure_as_list():
-    unstructurer = Unstructurer({list: unstructure_as_list, int: unstructure_as_int})
+    unstructurer = Unstructurer({list: AsList(), int: AsInt()})
 
     assert unstructurer.unstructure_as(list[int], [1, 2, 3]) == [1, 2, 3]
-    assert unstructurer.unstructure_as(list[int], (1, 2, 3)) == [1, 2, 3]
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(list[int], {"x": 1, "y": "a"})
+        AsList().unstructure(UnstructurerContext(None, list[int]), {"x": 1, "y": "a"})
     expected = UnstructuringError("Can only unstructure a Sequence as a list")
     assert_exception_matches(exc.value, expected)
 
@@ -211,16 +161,16 @@ def test_unstructure_as_list():
 def test_unstructure_as_dict():
     unstructurer = Unstructurer(
         {
-            dict: unstructure_as_dict,
-            int: unstructure_as_int,
-            str: unstructure_as_str,
+            dict: AsDict(),
+            int: AsInt(),
+            str: AsStr(),
         }
     )
 
     assert unstructurer.unstructure_as(dict[int, str], {1: "a", 2: "b"}) == {1: "a", 2: "b"}
 
     with pytest.raises(UnstructuringError) as exc:
-        unstructurer.unstructure_as(dict[int, str], [(1, "a"), (2, "b")])
+        AsDict().unstructure(UnstructurerContext(None, dict[int, str]), [(1, "a"), (2, "b")])
     expected = UnstructuringError("Can only unstructure a Mapping as a dict")
     assert_exception_matches(exc.value, expected)
 
@@ -243,14 +193,12 @@ def test_unstructure_as_dict():
     assert_exception_matches(exc.value, expected)
 
 
-def test_unstructure_dataclass_to_dict():
+def test_unstructure_as_dataclass_to_dict():
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            str: unstructure_as_str,
-            DataclassBase: UnstructureDataclassToDict(
-                name_converter=lambda name, _metadata: name + "_"
-            ),
+            int: AsInt(),
+            str: AsStr(),
+            DataclassBase: AsDataclassToDict(name_converter=lambda name, _metadata: name + "_"),
         },
     )
 
@@ -275,11 +223,11 @@ def test_unstructure_dataclass_to_dict():
     assert_exception_matches(exc.value, expected)
 
 
-def test_unstructure_dataclass_to_dict_invalid_handler():
+def test_unstructure_as_dataclass_to_dict_invalid_handler():
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            str: UnstructureDataclassToDict(),
+            int: AsInt(),
+            str: AsDataclassToDict(),
         },
     )
 
@@ -290,7 +238,7 @@ def test_unstructure_dataclass_to_dict_invalid_handler():
         unstructurer.unstructure_as(str, "1")
 
 
-def test_unstructure_dataclass_to_dict_skip_defaults():
+def test_unstructure_as_dataclass_to_dict_skip_defaults():
     # Badly behaving classes that raise an error on comparison,
     # so the unstructurer will have to process that when we're comparing
     # `z=A()` with the default `B()`
@@ -320,22 +268,22 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
         z: A | B = b
         w: str = field(default_factory=lambda: "c")
 
-    @simple_unstructure
-    def unstructure_a(_val):
-        return "A"
+    class ToA(UnstructureHandler):
+        def simple_unstructure(self, _val):
+            return "A"
 
-    @simple_unstructure
-    def unstructure_b(_val):
-        return "B"
+    class ToB(UnstructureHandler):
+        def simple_unstructure(self, _val):
+            return "B"
 
     unstructurer = Unstructurer(
         {
-            UnionType: unstructure_as_union,
-            A: unstructure_a,
-            B: unstructure_b,
-            int: unstructure_as_int,
-            str: unstructure_as_str,
-            DataclassBase: UnstructureDataclassToDict(),
+            UnionType: AsUnion(),
+            A: ToA(),
+            B: ToB(),
+            int: AsInt(),
+            str: AsStr(),
+            DataclassBase: AsDataclassToDict(),
         },
     )
 
@@ -346,12 +294,12 @@ def test_unstructure_dataclass_to_dict_skip_defaults():
     }
 
 
-def test_unstructure_dataclass_to_list():
+def test_unstructure_as_dataclass_to_list():
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            str: unstructure_as_str,
-            DataclassBase: unstructure_dataclass_to_list,
+            int: AsInt(),
+            str: AsStr(),
+            DataclassBase: AsDataclassToList(),
         },
     )
 
@@ -372,11 +320,11 @@ def test_unstructure_dataclass_to_list():
     assert_exception_matches(exc.value, expected)
 
 
-def test_unstructure_dataclass_to_list_invalid_handler():
+def test_unstructure_as_dataclass_to_list_invalid_handler():
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            str: unstructure_dataclass_to_list,
+            int: AsInt(),
+            str: AsDataclassToList(),
         },
     )
 
@@ -385,3 +333,37 @@ def test_unstructure_dataclass_to_list_invalid_handler():
     )
     with pytest.raises(UnstructuringError, match=message):
         unstructurer.unstructure_as(str, "1")
+
+
+def test_unstructure_as_named_tuple_to_dict():
+    unstructurer = Unstructurer(
+        {
+            int: AsInt(),
+            str: AsStr(),
+            NamedTupleBase: AsNamedTupleToDict(name_converter=lambda name, _metadata: name + "_"),
+        },
+    )
+
+    class Container(NamedTuple):
+        x: int
+        y: str = "default"
+
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="default")) == {"x_": 1}
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="a")) == {"x_": 1, "y_": "a"}
+
+
+def test_structure_as_named_tuple_to_list():
+    unstructurer = Unstructurer(
+        {
+            int: AsInt(),
+            str: AsStr(),
+            NamedTupleBase: AsNamedTupleToList(),
+        },
+    )
+
+    class Container(NamedTuple):
+        x: int
+        y: str = "default"
+
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="default")) == [1, "default"]
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="a")) == [1, "a"]

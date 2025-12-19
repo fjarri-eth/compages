@@ -1,5 +1,4 @@
 from collections.abc import Callable, Mapping, Sequence
-from functools import partial, wraps
 from types import MappingProxyType
 from typing import Any, get_args
 
@@ -11,168 +10,166 @@ from ._struct_like import (
     get_fields_dataclass,
     get_fields_named_tuple,
 )
-from ._structure import StructurerContext, StructuringError
+from ._structure import StructureHandler, StructurerContext, StructuringError
 from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVariant
 
 
-def simple_structure(func: Callable[[Any], Any]) -> Callable[[StructurerContext, Any], Any]:
-    @wraps(func)
-    def _wrapped(_context: StructurerContext, val: Any) -> Any:
-        return func(val)
-
-    return _wrapped
+class IntoNone(StructureHandler):
+    def simple_structure(self, val: Any) -> None:
+        if val is not None:
+            raise StructuringError("The value must be `None`")
 
 
-@simple_structure
-def structure_into_none(val: Any) -> None:
-    if val is not None:
-        raise StructuringError("The value must be `None`")
+class IntoInt(StructureHandler):
+    def simple_structure(self, val: Any) -> int:
+        # Handling a special case of `bool` here since in Python `bool` is an `int`,
+        # and we don't want to mix them up.
+        if not isinstance(val, int) or isinstance(val, bool):
+            raise StructuringError("The value must be an integer")
+        return val
 
 
-@simple_structure
-def structure_into_int(val: Any) -> int:
-    # Handling a special case of `bool` here since in Python `bool` is an `int`,
-    # and we don't want to mix them up.
-    if not isinstance(val, int) or isinstance(val, bool):
-        raise StructuringError("The value must be an integer")
-    return val
+class IntoFloat(StructureHandler):
+    def simple_structure(self, val: Any) -> float:
+        # Allow integers as well, even though `int` is not a subclass of `float` in Python.
+        if not isinstance(val, int | float):
+            raise StructuringError("The value must be a floating-point number")
+        return float(val)
 
 
-@simple_structure
-def structure_into_float(val: Any) -> float:
-    # Allow integers as well, even though `int` is not a subclass of `float` in Python.
-    if not isinstance(val, int | float):
-        raise StructuringError("The value must be a floating-point number")
-    return float(val)
+class IntoBool(StructureHandler):
+    def simple_structure(self, val: Any) -> bool:
+        if not isinstance(val, bool):
+            raise StructuringError("The value must be a boolean")
+        return val
 
 
-@simple_structure
-def structure_into_bool(val: Any) -> bool:
-    if not isinstance(val, bool):
-        raise StructuringError("The value must be a boolean")
-    return val
+class IntoBytes(StructureHandler):
+    def simple_structure(self, val: Any) -> bytes:
+        if not isinstance(val, bytes):
+            raise StructuringError("The value must be a bytestring")
+        return val
 
 
-@simple_structure
-def structure_into_bytes(val: Any) -> bytes:
-    if not isinstance(val, bytes):
-        raise StructuringError("The value must be a bytestring")
-    return val
+class IntoStr(StructureHandler):
+    def simple_structure(self, val: Any) -> str:
+        if not isinstance(val, str):
+            raise StructuringError("The value must be a string")
+        return val
 
 
-@simple_structure
-def structure_into_str(val: Any) -> str:
-    if not isinstance(val, str):
-        raise StructuringError("The value must be a string")
-    return val
+class IntoUnion(StructureHandler):
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        variants = get_args(context.structure_into)
 
+        exceptions: list[tuple[PathElem, StructuringError]] = []
+        for variant in variants:
+            try:
+                return context.structurer.structure_into(variant, val)
+            except StructuringError as exc:  # noqa: PERF203
+                exceptions.append((UnionVariant(variant), exc))
 
-def structure_into_union(context: StructurerContext, val: Any) -> Any:
-    variants = get_args(context.structure_into)
-
-    exceptions: list[tuple[PathElem, StructuringError]] = []
-    for variant in variants:
-        try:
-            return context.structurer.structure_into(variant, val)
-        except StructuringError as exc:  # noqa: PERF203
-            exceptions.append((UnionVariant(variant), exc))
-
-    raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
-
-
-def structure_into_tuple(context: StructurerContext, val: Any) -> Any:
-    if not isinstance(val, list | tuple):
-        raise StructuringError("Can only structure a tuple or a list into a tuple generic")
-
-    elem_types = get_args(context.structure_into)
-
-    # Homogeneous tuples (tuple[some_type, ...])
-    if len(elem_types) == 2 and elem_types[1] == ...:
-        elem_types = tuple(elem_types[0] for _ in range(len(val)))
-
-    if len(val) < len(elem_types):
-        raise StructuringError(
-            f"Not enough elements to structure into a tuple: got {len(val)}, need {len(elem_types)}"
-        )
-    if len(val) > len(elem_types):
-        raise StructuringError(
-            f"Too many elements to structure into a tuple: got {len(val)}, need {len(elem_types)}"
-        )
-
-    result = []
-    exceptions: list[tuple[PathElem, StructuringError]] = []
-    for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
-        try:
-            result.append(context.structurer.structure_into(tp, item))
-        except StructuringError as exc:  # noqa: PERF203
-            exceptions.append((ListElem(index), exc))
-
-    if exceptions:
         raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
-    return tuple(result)
+
+class IntoTuple(StructureHandler):
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, list | tuple):
+            raise StructuringError("Can only structure a tuple or a list into a tuple generic")
+
+        elem_types = get_args(context.structure_into)
+
+        # Homogeneous tuples (tuple[some_type, ...])
+        if len(elem_types) == 2 and elem_types[1] == ...:
+            elem_types = tuple(elem_types[0] for _ in range(len(val)))
+
+        if len(val) < len(elem_types):
+            raise StructuringError(
+                f"Not enough elements to structure into a tuple: "
+                f"got {len(val)}, need {len(elem_types)}"
+            )
+        if len(val) > len(elem_types):
+            raise StructuringError(
+                f"Too many elements to structure into a tuple: "
+                f"got {len(val)}, need {len(elem_types)}"
+            )
+
+        result = []
+        exceptions: list[tuple[PathElem, StructuringError]] = []
+        for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
+            try:
+                result.append(context.structurer.structure_into(tp, item))
+            except StructuringError as exc:  # noqa: PERF203
+                exceptions.append((ListElem(index), exc))
+
+        if exceptions:
+            raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
+
+        return tuple(result)
 
 
-def structure_into_list(context: StructurerContext, val: Any) -> Any:
-    if not isinstance(val, list | tuple):
-        raise StructuringError("Can only structure a tuple or a list into a list generic")
+class IntoList(StructureHandler):
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, list | tuple):
+            raise StructuringError("Can only structure a tuple or a list into a list generic")
 
-    (item_type,) = get_args(context.structure_into)
+        (item_type,) = get_args(context.structure_into)
 
-    result = []
-    exceptions: list[tuple[PathElem, StructuringError]] = []
-    for index, item in enumerate(val):
-        try:
-            result.append(context.structurer.structure_into(item_type, item))
-        except StructuringError as exc:  # noqa: PERF203
-            exceptions.append((ListElem(index), exc))
+        result = []
+        exceptions: list[tuple[PathElem, StructuringError]] = []
+        for index, item in enumerate(val):
+            try:
+                result.append(context.structurer.structure_into(item_type, item))
+            except StructuringError as exc:  # noqa: PERF203
+                exceptions.append((ListElem(index), exc))
 
-    if exceptions:
-        raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
+        if exceptions:
+            raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
 
-    return result
-
-
-def structure_into_dict(context: StructurerContext, val: Any) -> Any:
-    if not isinstance(val, dict):
-        raise StructuringError("Can only structure a dict into a dict generic")
-
-    key_type, value_type = get_args(context.structure_into)
-
-    result = {}
-    exceptions: list[tuple[PathElem, StructuringError]] = []
-    for key, value in val.items():
-        success = True
-
-        try:
-            structured_key = context.structurer.structure_into(key_type, key)
-        except StructuringError as exc:
-            success = False
-            exceptions.append((DictKey(key), exc))
-
-        try:
-            structured_value = context.structurer.structure_into(value_type, value)
-        except StructuringError as exc:
-            success = False
-            exceptions.append((DictValue(key), exc))
-
-        if success:
-            result[structured_key] = structured_value
-
-    if exceptions:
-        raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
-
-    return result
+        return result
 
 
-class _StructureSequenceIntoStructLike:
+class IntoDict(StructureHandler):
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        if not isinstance(val, dict):
+            raise StructuringError("Can only structure a dict into a dict generic")
+
+        key_type, value_type = get_args(context.structure_into)
+
+        result = {}
+        exceptions: list[tuple[PathElem, StructuringError]] = []
+        for key, value in val.items():
+            success = True
+
+            try:
+                structured_key = context.structurer.structure_into(key_type, key)
+            except StructuringError as exc:
+                success = False
+                exceptions.append((DictKey(key), exc))
+
+            try:
+                structured_value = context.structurer.structure_into(value_type, value)
+            except StructuringError as exc:
+                success = False
+                exceptions.append((DictValue(key), exc))
+
+            if success:
+                result[structured_key] = structured_value
+
+        if exceptions:
+            raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
+
+        return result
+
+
+class _SequenceIntoStructLike(StructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
     ):
         self._get_fields = get_fields
 
-    def __call__(self, context: StructurerContext, val: Any) -> Any:
+    def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, Sequence):
             raise StructuringError(f"Can only structure a `Sequence` into {context.structure_into}")
 
@@ -210,7 +207,7 @@ class _StructureSequenceIntoStructLike:
         return context.structure_into(**results)
 
 
-class _StructureMappingIntoStructLike:
+class _MappingIntoStructLike(StructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
@@ -220,7 +217,7 @@ class _StructureMappingIntoStructLike:
         self._get_fields = get_fields
         self._name_converter = name_converter
 
-    def __call__(self, context: StructurerContext, val: Any) -> Any:
+    def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, Mapping | MappingProxyType):
             raise StructuringError(f"Can only structure a mapping into {context.structure_into}")
 
@@ -262,8 +259,43 @@ class _StructureMappingIntoStructLike:
         return context.structure_into(**results)
 
 
-structure_sequence_into_dataclass = _StructureSequenceIntoStructLike(get_fields_dataclass)
-StructureMappingIntoDataclass = partial(_StructureMappingIntoStructLike, get_fields_dataclass)
+class IntoDataclassFromSequence(StructureHandler):
+    def __init__(self) -> None:
+        self._handler = _SequenceIntoStructLike(get_fields_dataclass)
 
-structure_sequence_into_named_tuple = _StructureSequenceIntoStructLike(get_fields_named_tuple)
-StructureMappingIntoNamedTuple = partial(_StructureMappingIntoStructLike, get_fields_named_tuple)
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        return self._handler.structure(context, val)
+
+
+class IntoDataclassFromMapping(StructureHandler):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
+        self._handler = _MappingIntoStructLike(get_fields_dataclass, name_converter=name_converter)
+
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        return self._handler.structure(context, val)
+
+
+class IntoNamedTupleFromSequence(StructureHandler):
+    def __init__(self) -> None:
+        self._handler = _SequenceIntoStructLike(get_fields_named_tuple)
+
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        return self._handler.structure(context, val)
+
+
+class IntoNamedTupleFromMapping(StructureHandler):
+    def __init__(
+        self,
+        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
+        _metadata: name,
+    ):
+        self._handler = _MappingIntoStructLike(
+            get_fields_named_tuple, name_converter=name_converter
+        )
+
+    def structure(self, context: StructurerContext, val: Any) -> Any:
+        return self._handler.structure(context, val)

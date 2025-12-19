@@ -4,7 +4,14 @@ from types import UnionType
 from typing import NamedTuple, NewType, Union
 
 import pytest
-from compages._common import DataclassBase, GeneratorStack, NamedTupleBase, Result, get_lookup_order
+from compages._common import (
+    DataclassBase,
+    GeneratorStack,
+    NamedTupleBase,
+    Result,
+    get_lookup_order,
+    isinstance_ext,
+)
 
 
 def test_normal_operation():
@@ -51,6 +58,31 @@ def test_multiple_yields():
 
     with pytest.raises(RuntimeError, match="Expected only one yield in a generator"):
         stack.push(f2)
+
+
+def test_isinstance_ext():
+    class A:
+        pass
+
+    class B(A):
+        pass
+
+    C = NewType("C", int)
+    D = NewType("D", C)
+
+    assert isinstance_ext(B(), get_lookup_order(A))
+    assert not isinstance_ext(A(), get_lookup_order(B))
+    assert isinstance_ext(1, get_lookup_order(D))
+    assert isinstance_ext([1], get_lookup_order(list[int]))
+
+    # Note: `isinstance_ext()` cannot introspect the value
+    assert isinstance_ext(["a"], get_lookup_order(list[int]))
+
+    assert isinstance_ext(1, get_lookup_order(int | str))
+
+    # Since the value cannot be introspected any value is `isinstance_ext(..., UnionType)`
+    assert isinstance_ext(None, get_lookup_order(int | str))
+    assert isinstance_ext(None, get_lookup_order(Union[int, str]))
 
 
 def test_lookup_order():

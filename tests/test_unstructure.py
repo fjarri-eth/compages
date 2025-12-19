@@ -5,16 +5,15 @@ from typing import NewType
 
 import pytest
 from compages import (
+    AsDataclassToDict,
+    AsDict,
+    AsInt,
+    AsList,
+    AsUnion,
     DataclassBase,
-    UnstructureDataclassToDict,
+    UnstructureHandler,
     Unstructurer,
     UnstructuringError,
-    simple_unstructure,
-    unstructure_as_dict,
-    unstructure_as_int,
-    unstructure_as_list,
-    unstructure_as_str,
-    unstructure_as_union,
 )
 from compages.path import DictKey, DictValue, ListElem, StructField, UnionVariant
 
@@ -36,9 +35,9 @@ def assert_exception_matches(exc, reference_exc):
         assert_exception_matches(inner_exc, ref_exc)
 
 
-@simple_unstructure
-def unstructure_as_hex_int(val):
-    return hex(val)
+class AsIntToHex(UnstructureHandler):
+    def simple_unstructure(self, val):
+        return hex(val)
 
 
 def test_unstructure_routing():
@@ -57,17 +56,17 @@ def test_unstructure_routing():
         # will have a specific `list[int]` handler, which takes priority over the generic `list` one
         custom_generic: list[int]
 
-    @simple_unstructure
-    def unstructure_as_custom_generic(val):
-        return val
+    class PassThrough(UnstructureHandler):
+        def simple_unstructure(self, val):
+            return val
 
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            HexInt: unstructure_as_hex_int,
-            list[int]: unstructure_as_custom_generic,
-            list: unstructure_as_list,
-            DataclassBase: UnstructureDataclassToDict(),
+            int: AsInt(),
+            HexInt: AsIntToHex(),
+            list[int]: PassThrough(),
+            list: AsList(),
+            DataclassBase: AsDataclassToDict(),
         }
     )
 
@@ -85,17 +84,17 @@ def test_unstructure_generators():
     class Container:
         x: int
 
-    @simple_unstructure
-    def unstructure_container(val):
-        to_lower_level = Container(val.x + 10)
-        from_lower_level = yield to_lower_level
-        return {"x": from_lower_level["x"] * 2}
+    class Modify(UnstructureHandler):
+        def simple_unstructure(self, val):
+            to_lower_level = Container(val.x + 10)
+            from_lower_level = yield to_lower_level
+            return {"x": from_lower_level["x"] * 2}
 
     unstructurer = Unstructurer(
         {
-            int: unstructure_as_int,
-            Container: unstructure_container,
-            DataclassBase: UnstructureDataclassToDict(),
+            int: AsInt(),
+            Container: Modify(),
+            DataclassBase: AsDataclassToDict(),
         }
     )
 
@@ -111,11 +110,12 @@ def test_unstructure_no_finalizing_handler():
     class Container:
         x: int
 
-    def my_unstructure_dataclass(_context, val):
-        new_val = yield val
-        return new_val
+    class PassThrough(UnstructureHandler):
+        def simple_unstructure(self, val):
+            new_val = yield val
+            return new_val
 
-    unstructurer = Unstructurer({DataclassBase: my_unstructure_dataclass})
+    unstructurer = Unstructurer({DataclassBase: PassThrough()})
 
     with pytest.raises(
         UnstructuringError, match="Could not find a non-generator handler to unstructure as"
@@ -132,6 +132,19 @@ def test_unstructure_routing_handler_not_found():
     assert_exception_matches(exc.value, expected)
 
 
+def test_unstructure_handler_fallback():
+    class Foo(UnstructureHandler):
+        pass
+
+    unstructurer = Unstructurer({int: Foo()})
+
+    message = re.escape(
+        "`UnstructureHandler` must implement either `unstructure()` or `simple_unstructure()`"
+    )
+    with pytest.raises(NotImplementedError, match=message) as exc:
+        unstructurer.unstructure_as(int, 1)
+
+
 def test_error_rendering():
     @dataclass
     class Inner:
@@ -144,18 +157,33 @@ def test_error_rendering():
         x: int
         y: Inner
 
+    # Some custom unstructurers to test failures deep in the hierarchy
+    # (specifically, the kind of failures that are not caught by a simple typecheck a level above)
+
+    class AsPositiveInt(UnstructureHandler):
+        def simple_unstructure(self, val):
+            if val > 0:
+                return val
+            raise UnstructuringError("The value must be positive")
+
+    class AsLowercaseStr(UnstructureHandler):
+        def simple_unstructure(self, val):
+            if val.islower():
+                return val
+            raise UnstructuringError("The string must be lowercase")
+
     unstructurer = Unstructurer(
         {
-            UnionType: unstructure_as_union,
-            list: unstructure_as_list,
-            dict: unstructure_as_dict,
-            int: unstructure_as_int,
-            str: unstructure_as_str,
-            DataclassBase: UnstructureDataclassToDict(),
+            UnionType: AsUnion(),
+            list: AsList(),
+            dict: AsDict(),
+            int: AsPositiveInt(),
+            str: AsLowercaseStr(),
+            DataclassBase: AsDataclassToDict(),
         }
     )
 
-    data = Outer(x="a", y=Inner(u=1.2, d={"a": "b", 1: 2}, lst=[1, "a"]))
+    data = Outer(x="a", y=Inner(u=-1, d={"a": "b", 1: "A"}, lst=[1, "a"]))
     with pytest.raises(UnstructuringError) as exc:
         unstructurer.unstructure_as(Outer, data)
     expected = UnstructuringError(
@@ -174,7 +202,7 @@ def test_error_rendering():
                                 [
                                     (
                                         UnionVariant(int),
-                                        UnstructuringError("The value must be of type `int`"),
+                                        UnstructuringError("The value must be positive"),
                                     ),
                                     (
                                         UnionVariant(str),
@@ -194,7 +222,7 @@ def test_error_rendering():
                                     ),
                                     (
                                         DictValue(1),
-                                        UnstructuringError("The value must be of type `str`"),
+                                        UnstructuringError("The string must be lowercase"),
                                     ),
                                 ],
                             ),
@@ -224,11 +252,11 @@ Failed to unstructure to a dict as <class 'test_unstructure.test_error_rendering
   x: The value must be of type `int`
   y: Failed to unstructure to a dict as <class 'test_unstructure.test_error_rendering.<locals>.Inner'>
     y.u: Cannot unstructure as int | str
-      y.u.<int>: The value must be of type `int`
+      y.u.<int>: The value must be positive
       y.u.<str>: The value must be of type `str`
     y.d: Cannot unstructure as dict[int, str]
       y.d.key(a): The value must be of type `int`
-      y.d.[1]: The value must be of type `str`
+      y.d.[1]: The string must be lowercase
     y.lst: Cannot unstructure as list[int]
       y.lst.[1]: The value must be of type `int`
 """.strip()  # noqa: E501

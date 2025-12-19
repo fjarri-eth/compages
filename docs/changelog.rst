@@ -10,6 +10,8 @@ Changed
 - Handlers now take a single context argument (``StructurerContext`` or ``UnstructurerContext``) which contain the structurer and the target type. (PR_20_)
 - Support any ``Sequence`` type instead of just a list when structuring into a struct-like. Consequently, the handlers had ``list`` changed to ``sequence``. (PR_22_)
 - Support any ``Mapping`` type or ``MappingProxyType`` instead of just a dict when structuring into a struct-like. Consequently, the handlers had ``Dict`` changed to ``Mapping``. (PR_22_)
+- Uniformized structurer/unstructurers. Now they are all classes based on ``StructureHandler``/``UnstructureHandler``. ``simple_structurer``, ``simple_unstructurer`` removed. (PR_23_)
+- ``simple_typechecked_unstructurer`` removed, now ``Unstructurer.unstructure_as`` performs the typecheck. (PR_23_)
 
 
 Added
@@ -28,6 +30,7 @@ Fixed
 .. _PR_20: https://github.com/fjarri-eth/compages/pull/20
 .. _PR_21: https://github.com/fjarri-eth/compages/pull/21
 .. _PR_22: https://github.com/fjarri-eth/compages/pull/22
+.. _PR_23: https://github.com/fjarri-eth/compages/pull/23
 
 
 0.3.0 (2024-03-15)

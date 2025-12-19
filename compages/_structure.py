@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any, NamedTuple, TypeVar
 
 from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
@@ -40,10 +40,24 @@ class StructurerContext(NamedTuple):
     structure_into: ExtendedType[Any]
 
 
+class StructureHandler:
+    def structure(
+        self,
+        context: StructurerContext,  # noqa: ARG002
+        value: Any,
+    ) -> Any:
+        return self.simple_structure(value)
+
+    def simple_structure(self, value: Any) -> Any:
+        raise NotImplementedError(
+            "`StructureHandler` must implement either `structure()` or `simple_structure()`"
+        )
+
+
 class Structurer:
     def __init__(
         self,
-        handlers: Mapping[Any, Callable[[StructurerContext, Any], Any]] = {},
+        handlers: Mapping[Any, StructureHandler] = {},
     ):
         self._handlers = dict(handlers)
 
@@ -54,7 +68,7 @@ class Structurer:
 
         for tp in lookup_order:
             handler = self._handlers.get(tp, None)
-            result = stack.push(handler)
+            result = stack.push(handler.structure if handler else None)
             if result is not Result.UNDEFINED:
                 return result
 

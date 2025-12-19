@@ -227,6 +227,14 @@ class _AsStructLikeToList(UnstructureHandler):
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 
+        # We can omit the default values if they are in the end of the sequence
+        for field in reversed(struct_fields):
+            default = field.get_default()
+            if default is not NoDefault and result[-1] == default:
+                result.pop()
+            else:
+                break
+
         if exceptions:
             raise UnstructuringError(
                 f"Failed to unstructure to a list as {context.unstructure_as}", exceptions

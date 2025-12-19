@@ -148,7 +148,7 @@ def test_structure_handler_fallback():
     message = re.escape(
         "`StructureHandler` must implement either `structure()` or `simple_structure()`"
     )
-    with pytest.raises(NotImplementedError, match=message) as exc:
+    with pytest.raises(NotImplementedError, match=message):
         structurer.structure_into(int, 1)
 
 

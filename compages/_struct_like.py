@@ -20,6 +20,13 @@ class Field(NamedTuple):
     default_factory: None | Callable[[], Any] = None
     metadata: Any = None
 
+    def get_default(self) -> Any:
+        if self.default is not NoDefault:
+            return self.default
+        if self.default_factory is not None:
+            return self.default_factory()
+        return NoDefault
+
 
 def get_fields_named_tuple(tp: ExtendedType[Any]) -> list[Field]:
     try:

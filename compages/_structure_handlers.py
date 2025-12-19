@@ -186,16 +186,16 @@ class _SequenceIntoStructLike(StructureHandler):
         if len(val) > len(struct_fields):
             raise StructuringError(f"Too many fields to serialize into {context.structure_into}")
 
-        for i, field in enumerate(struct_fields):
-            if i < len(val):
-                try:
-                    results[field.name] = context.structurer.structure_into(field.type, val[i])
-                except StructuringError as exc:
-                    exceptions.append((StructField(field.name), exc))
-            elif field.default is not NoDefault:
-                results[field.name] = field.default
-            elif field.default_factory is not None:
-                results[field.name] = field.default_factory()
+        for i, field in enumerate(struct_fields[: len(val)]):
+            try:
+                results[field.name] = context.structurer.structure_into(field.type, val[i])
+            except StructuringError as exc:  # noqa: PERF203
+                exceptions.append((StructField(field.name), exc))
+
+        for field in struct_fields[len(val) :]:
+            default = field.get_default()
+            if default is not NoDefault:
+                results[field.name] = default
             else:
                 exceptions.append((StructField(field.name), StructuringError("Missing field")))
 
@@ -240,10 +240,11 @@ class _MappingIntoStructLike(StructureHandler):
                     )
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
-            elif field.default is not NoDefault:
-                results[field.name] = field.default
-            elif field.default_factory is not None:
-                results[field.name] = field.default_factory()
+                continue
+
+            default = field.get_default()
+            if default is not NoDefault:
+                results[field.name] = default
             else:
                 if val_name == field.name:
                     message = "Missing field"

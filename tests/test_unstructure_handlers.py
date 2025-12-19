@@ -365,5 +365,5 @@ def test_structure_as_named_tuple_to_list():
         x: int
         y: str = "default"
 
-    assert unstructurer.unstructure_as(Container, Container(x=1, y="default")) == [1, "default"]
+    assert unstructurer.unstructure_as(Container, Container(x=1, y="default")) == [1]
     assert unstructurer.unstructure_as(Container, Container(x=1, y="a")) == [1, "a"]

@@ -4,6 +4,7 @@ from typing import NamedTuple
 import pytest
 from compages._struct_like import (
     Field,
+    NoDefault,
     StructAdapterError,
     get_fields_dataclass,
     get_fields_named_tuple,
@@ -18,6 +19,12 @@ def test_get_fields_named_tuple():
     fields = get_fields_named_tuple(Container)
 
     assert fields == [Field(name="x", type=int), Field(name="y", type=str, default="foo")]
+
+
+def test_get_default():
+    assert Field(name="x", type=int).get_default() is NoDefault
+    assert Field(name="x", type=int, default=999).get_default() == 999
+    assert Field(name="x", type=int, default_factory=lambda: 999).get_default() == 999
 
 
 def test_get_fields_named_tuple_hint_resolution():

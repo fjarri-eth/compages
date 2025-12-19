@@ -12,6 +12,7 @@ Changed
 - Support any ``Mapping`` type or ``MappingProxyType`` instead of just a dict when structuring into a struct-like. Consequently, the handlers had ``Dict`` changed to ``Mapping``. (PR_22_)
 - Uniformized structurer/unstructurers. Now they are all classes based on ``StructureHandler``/``UnstructureHandler``. ``simple_structurer``, ``simple_unstructurer`` removed. (PR_23_)
 - ``simple_typechecked_unstructurer`` removed, now ``Unstructurer.unstructure_as`` performs the typecheck. (PR_23_)
+- Skip final default values when unstructuring from a struct-like into a sequence. (PR_23_)
 
 
 Added

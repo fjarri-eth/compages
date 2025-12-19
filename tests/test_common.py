@@ -82,7 +82,7 @@ def test_isinstance_ext():
 
     # Since the value cannot be introspected any value is `isinstance_ext(..., UnionType)`
     assert isinstance_ext(None, get_lookup_order(int | str))
-    assert isinstance_ext(None, get_lookup_order(Union[int, str]))
+    assert isinstance_ext(None, get_lookup_order(Union[int, str]))  # noqa: UP007
 
 
 def test_lookup_order():

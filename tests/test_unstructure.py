@@ -141,7 +141,7 @@ def test_unstructure_handler_fallback():
     message = re.escape(
         "`UnstructureHandler` must implement either `unstructure()` or `simple_unstructure()`"
     )
-    with pytest.raises(NotImplementedError, match=message) as exc:
+    with pytest.raises(NotImplementedError, match=message):
         unstructurer.unstructure_as(int, 1)
 
 

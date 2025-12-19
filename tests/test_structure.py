@@ -152,6 +152,21 @@ def test_structure_handler_fallback():
         structurer.structure_into(int, 1)
 
 
+def test_user_context():
+    class Context:
+        pass
+
+    user_context = Context()
+
+    class Foo(StructureHandler):
+        def structure(self, context, val):
+            assert context.user_context is user_context
+            return val
+
+    structurer = Structurer({int: Foo()})
+    assert structurer.structure_into(int, 1, user_context=user_context) == 1
+
+
 def test_error_rendering():
     @dataclass
     class Inner:

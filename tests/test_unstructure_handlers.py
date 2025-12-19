@@ -117,7 +117,7 @@ def test_unstructure_as_tuple():
     assert unstructurer.unstructure_as(tuple[int, ...], (1, 2, 3)) == [1, 2, 3]
 
     with pytest.raises(UnstructuringError) as exc:
-        AsTuple().unstructure(UnstructurerContext(None, tuple[int, str]), {"x": 1, "y": "a"})
+        AsTuple().unstructure(UnstructurerContext(None, tuple[int, str], None), {"x": 1, "y": "a"})
     expected = UnstructuringError("Can only unstructure a Sequence as a tuple")
     assert_exception_matches(exc.value, expected)
 
@@ -146,7 +146,7 @@ def test_unstructure_as_list():
     assert unstructurer.unstructure_as(list[int], [1, 2, 3]) == [1, 2, 3]
 
     with pytest.raises(UnstructuringError) as exc:
-        AsList().unstructure(UnstructurerContext(None, list[int]), {"x": 1, "y": "a"})
+        AsList().unstructure(UnstructurerContext(None, list[int], None), {"x": 1, "y": "a"})
     expected = UnstructuringError("Can only unstructure a Sequence as a list")
     assert_exception_matches(exc.value, expected)
 
@@ -171,7 +171,7 @@ def test_unstructure_as_dict():
     assert unstructurer.unstructure_as(dict[int, str], {1: "a", 2: "b"}) == {1: "a", 2: "b"}
 
     with pytest.raises(UnstructuringError) as exc:
-        AsDict().unstructure(UnstructurerContext(None, dict[int, str]), [(1, "a"), (2, "b")])
+        AsDict().unstructure(UnstructurerContext(None, dict[int, str], None), [(1, "a"), (2, "b")])
     expected = UnstructuringError("Can only unstructure a Mapping as a dict")
     assert_exception_matches(exc.value, expected)
 

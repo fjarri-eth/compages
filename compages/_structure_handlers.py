@@ -66,7 +66,7 @@ class IntoUnion(StructureHandler):
         exceptions: list[tuple[PathElem, StructuringError]] = []
         for variant in variants:
             try:
-                return context.structurer.structure_into(variant, val)
+                return context.nested_structure_into(variant, val)
             except StructuringError as exc:  # noqa: PERF203
                 exceptions.append((UnionVariant(variant), exc))
 
@@ -99,7 +99,7 @@ class IntoTuple(StructureHandler):
         exceptions: list[tuple[PathElem, StructuringError]] = []
         for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
             try:
-                result.append(context.structurer.structure_into(tp, item))
+                result.append(context.nested_structure_into(tp, item))
             except StructuringError as exc:  # noqa: PERF203
                 exceptions.append((ListElem(index), exc))
 
@@ -120,7 +120,7 @@ class IntoList(StructureHandler):
         exceptions: list[tuple[PathElem, StructuringError]] = []
         for index, item in enumerate(val):
             try:
-                result.append(context.structurer.structure_into(item_type, item))
+                result.append(context.nested_structure_into(item_type, item))
             except StructuringError as exc:  # noqa: PERF203
                 exceptions.append((ListElem(index), exc))
 
@@ -143,13 +143,13 @@ class IntoDict(StructureHandler):
             success = True
 
             try:
-                structured_key = context.structurer.structure_into(key_type, key)
+                structured_key = context.nested_structure_into(key_type, key)
             except StructuringError as exc:
                 success = False
                 exceptions.append((DictKey(key), exc))
 
             try:
-                structured_value = context.structurer.structure_into(value_type, value)
+                structured_value = context.nested_structure_into(value_type, value)
             except StructuringError as exc:
                 success = False
                 exceptions.append((DictValue(key), exc))
@@ -191,7 +191,7 @@ class _SequenceIntoStructLike(StructureHandler):
 
         for i, field in enumerate(struct_fields[: len(val)]):
             try:
-                results[field.name] = context.structurer.structure_into(field.type, val[i])
+                results[field.name] = context.nested_structure_into(field.type, val[i])
             except StructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 
@@ -239,9 +239,7 @@ class _MappingIntoStructLike(StructureHandler):
             val_name = self._options.to_unstructured_name(field.name, field.metadata)
             if val_name in val:
                 try:
-                    results[field.name] = context.structurer.structure_into(
-                        field.type, val[val_name]
-                    )
+                    results[field.name] = context.nested_structure_into(field.type, val[val_name])
                 except StructuringError as exc:
                     exceptions.append((StructField(field.name), exc))
                 continue

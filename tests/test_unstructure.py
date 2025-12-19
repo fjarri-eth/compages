@@ -145,6 +145,21 @@ def test_unstructure_handler_fallback():
         unstructurer.unstructure_as(int, 1)
 
 
+def test_user_context():
+    class Context:
+        pass
+
+    user_context = Context()
+
+    class Foo(UnstructureHandler):
+        def unstructure(self, context, val):
+            assert context.user_context is user_context
+            return val
+
+    unstructurer = Unstructurer({int: Foo()})
+    assert unstructurer.unstructure_as(int, 1, user_context=user_context) == 1
+
+
 def test_error_rendering():
     @dataclass
     class Inner:

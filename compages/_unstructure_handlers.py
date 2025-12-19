@@ -59,7 +59,7 @@ class AsUnion(UnstructureHandler):
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for variant in variants:
             try:
-                return context.unstructurer.unstructure_as(variant, val)
+                return context.nested_unstructure_as(variant, val)
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((UnionVariant(variant), exc))
 
@@ -92,7 +92,7 @@ class AsTuple(UnstructureHandler):
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
             try:
-                result.append(context.unstructurer.unstructure_as(tp, item))
+                result.append(context.nested_unstructure_as(tp, item))
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((ListElem(index), exc))
 
@@ -114,13 +114,13 @@ class AsDict(UnstructureHandler):
         for key, value in val.items():
             success = True
             try:
-                unstructured_key = context.unstructurer.unstructure_as(key_type, key)
+                unstructured_key = context.nested_unstructure_as(key_type, key)
             except UnstructuringError as exc:
                 success = False
                 exceptions.append((DictKey(key), exc))
 
             try:
-                unstructured_value = context.unstructurer.unstructure_as(value_type, value)
+                unstructured_value = context.nested_unstructure_as(value_type, value)
             except UnstructuringError as exc:
                 success = False
                 exceptions.append((DictValue(key), exc))
@@ -145,7 +145,7 @@ class AsList(UnstructureHandler):
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
         for index, item in enumerate(val):
             try:
-                result.append(context.unstructurer.unstructure_as(item_type, item))
+                result.append(context.nested_unstructure_as(item_type, item))
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((ListElem(index), exc))
 
@@ -193,7 +193,7 @@ class _AsStructLikeToDict(UnstructureHandler):
                     pass
 
             try:
-                result[result_name] = context.unstructurer.unstructure_as(field.type, value)
+                result[result_name] = context.nested_unstructure_as(field.type, value)
             except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
@@ -227,9 +227,7 @@ class _AsStructLikeToList(UnstructureHandler):
 
         for field in struct_fields:
             try:
-                result.append(
-                    context.unstructurer.unstructure_as(field.type, getattr(val, field.name))
-                )
+                result.append(context.nested_unstructure_as(field.type, getattr(val, field.name)))
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 

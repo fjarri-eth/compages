@@ -89,3 +89,9 @@ def get_fields_dataclass(tp: ExtendedType[Any]) -> list[Field]:
         )
 
     return fields
+
+
+class StructLikeOptions(NamedTuple):
+    to_unstructured_name: Callable[[str, Any], str] = lambda name, _metadata: name
+    unstructure_skip_defaults: bool = True
+    structure_fill_in_defaults: bool = True

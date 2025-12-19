@@ -7,6 +7,7 @@ from ._struct_like import (
     Field,
     NoDefault,
     StructAdapterError,
+    StructLikeOptions,
     get_fields_dataclass,
     get_fields_named_tuple,
 )
@@ -166,8 +167,10 @@ class _SequenceIntoStructLike(StructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
+        options: StructLikeOptions,
     ):
         self._get_fields = get_fields
+        self._options = options
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, Sequence):
@@ -193,8 +196,10 @@ class _SequenceIntoStructLike(StructureHandler):
                 exceptions.append((StructField(field.name), exc))
 
         for field in struct_fields[len(val) :]:
-            default = field.get_default()
-            if default is not NoDefault:
+            if (
+                self._options.structure_fill_in_defaults
+                and (default := field.get_default()) is not NoDefault
+            ):
                 results[field.name] = default
             else:
                 exceptions.append((StructField(field.name), StructuringError("Missing field")))
@@ -211,11 +216,10 @@ class _MappingIntoStructLike(StructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
+        options: StructLikeOptions,
     ):
         self._get_fields = get_fields
-        self._name_converter = name_converter
+        self._options = options
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, Mapping | MappingProxyType):
@@ -232,7 +236,7 @@ class _MappingIntoStructLike(StructureHandler):
             ) from exc
 
         for field in struct_fields:
-            val_name = self._name_converter(field.name, field.metadata)
+            val_name = self._options.to_unstructured_name(field.name, field.metadata)
             if val_name in val:
                 try:
                     results[field.name] = context.structurer.structure_into(
@@ -242,8 +246,10 @@ class _MappingIntoStructLike(StructureHandler):
                     exceptions.append((StructField(field.name), exc))
                 continue
 
-            default = field.get_default()
-            if default is not NoDefault:
+            if (
+                self._options.structure_fill_in_defaults
+                and (default := field.get_default()) is not NoDefault
+            ):
                 results[field.name] = default
             else:
                 if val_name == field.name:
@@ -261,42 +267,32 @@ class _MappingIntoStructLike(StructureHandler):
 
 
 class IntoDataclassFromSequence(StructureHandler):
-    def __init__(self) -> None:
-        self._handler = _SequenceIntoStructLike(get_fields_dataclass)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _SequenceIntoStructLike(get_fields_dataclass, options)
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         return self._handler.structure(context, val)
 
 
 class IntoDataclassFromMapping(StructureHandler):
-    def __init__(
-        self,
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
-    ):
-        self._handler = _MappingIntoStructLike(get_fields_dataclass, name_converter=name_converter)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _MappingIntoStructLike(get_fields_dataclass, options)
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         return self._handler.structure(context, val)
 
 
 class IntoNamedTupleFromSequence(StructureHandler):
-    def __init__(self) -> None:
-        self._handler = _SequenceIntoStructLike(get_fields_named_tuple)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _SequenceIntoStructLike(get_fields_named_tuple, options)
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         return self._handler.structure(context, val)
 
 
 class IntoNamedTupleFromMapping(StructureHandler):
-    def __init__(
-        self,
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
-    ):
-        self._handler = _MappingIntoStructLike(
-            get_fields_named_tuple, name_converter=name_converter
-        )
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _MappingIntoStructLike(get_fields_named_tuple, options)
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         return self._handler.structure(context, val)

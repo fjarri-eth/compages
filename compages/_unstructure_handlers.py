@@ -1,5 +1,4 @@
 from collections.abc import Callable, Mapping, Sequence
-from types import MappingProxyType
 from typing import Any, get_args
 
 from ._common import ExtendedType
@@ -7,6 +6,7 @@ from ._struct_like import (
     Field,
     NoDefault,
     StructAdapterError,
+    StructLikeOptions,
     get_fields_dataclass,
     get_fields_named_tuple,
 )
@@ -159,11 +159,10 @@ class _AsStructLikeToDict(UnstructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
+        options: StructLikeOptions,
     ):
         self._get_fields = get_fields
-        self._name_converter = name_converter
+        self._options = options
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         result = {}
@@ -177,17 +176,22 @@ class _AsStructLikeToDict(UnstructureHandler):
             ) from exc
 
         for field in struct_fields:
-            result_name = self._name_converter(field.name, field.metadata)
+            result_name = self._options.to_unstructured_name(field.name, field.metadata)
             value = getattr(val, field.name)
             # If the value field is equal to the default one, don't add it to the result.
-            try:
-                if (field.default is not NoDefault and value == field.default) or (
-                    field.default_factory is not None and value == field.default_factory()
-                ):
-                    continue
-            # On the off-chance the comparison is strict and raises an exception on type mismatch
-            except Exception:  # noqa: S110, BLE001
-                pass
+
+            if (
+                self._options.unstructure_skip_defaults
+                and (default := field.get_default()) is not NoDefault
+            ):
+                try:
+                    if value == default:
+                        continue
+                # On the off-chance the comparison is strict
+                # and raises an exception on type mismatch
+                except Exception:  # noqa: S110, BLE001
+                    pass
+
             try:
                 result[result_name] = context.unstructurer.unstructure_as(field.type, value)
             except UnstructuringError as exc:
@@ -205,8 +209,10 @@ class _AsStructLikeToList(UnstructureHandler):
     def __init__(
         self,
         get_fields: Callable[[ExtendedType[Any]], list[Field]],
+        options: StructLikeOptions,
     ):
         self._get_fields = get_fields
+        self._options = options
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         result = []
@@ -227,13 +233,14 @@ class _AsStructLikeToList(UnstructureHandler):
             except UnstructuringError as exc:  # noqa: PERF203
                 exceptions.append((StructField(field.name), exc))
 
-        # We can omit the default values if they are in the end of the sequence
-        for field in reversed(struct_fields):
-            default = field.get_default()
-            if default is not NoDefault and result[-1] == default:
-                result.pop()
-            else:
-                break
+        if self._options.unstructure_skip_defaults:
+            # We can omit the default values if they are in the end of the sequence
+            for field in reversed(struct_fields):
+                default = field.get_default()
+                if default is not NoDefault and result[-1] == default:
+                    result.pop()
+                else:
+                    break
 
         if exceptions:
             raise UnstructuringError(
@@ -244,40 +251,32 @@ class _AsStructLikeToList(UnstructureHandler):
 
 
 class AsDataclassToList(UnstructureHandler):
-    def __init__(self) -> None:
-        self._handler = _AsStructLikeToList(get_fields_dataclass)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()) -> None:
+        self._handler = _AsStructLikeToList(get_fields_dataclass, options)
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         return self._handler.unstructure(context, val)
 
 
 class AsDataclassToDict(UnstructureHandler):
-    def __init__(
-        self,
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
-    ):
-        self._handler = _AsStructLikeToDict(get_fields_dataclass, name_converter=name_converter)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _AsStructLikeToDict(get_fields_dataclass, options)
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         return self._handler.unstructure(context, val)
 
 
 class AsNamedTupleToList(UnstructureHandler):
-    def __init__(self) -> None:
-        self._handler = _AsStructLikeToList(get_fields_named_tuple)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _AsStructLikeToList(get_fields_named_tuple, options)
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         return self._handler.unstructure(context, val)
 
 
 class AsNamedTupleToDict(UnstructureHandler):
-    def __init__(
-        self,
-        name_converter: Callable[[str, MappingProxyType[Any, Any]], str] = lambda name,
-        _metadata: name,
-    ):
-        self._handler = _AsStructLikeToDict(get_fields_named_tuple, name_converter=name_converter)
+    def __init__(self, options: StructLikeOptions = StructLikeOptions()):
+        self._handler = _AsStructLikeToDict(get_fields_named_tuple, options)
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         return self._handler.unstructure(context, val)

@@ -13,6 +13,7 @@ Changed
 - Uniformized structurer/unstructurers. Now they are all classes based on ``StructureHandler``/``UnstructureHandler``. ``simple_structurer``, ``simple_unstructurer`` removed. (PR_23_)
 - ``simple_typechecked_unstructurer`` removed, now ``Unstructurer.unstructure_as`` performs the typecheck. (PR_23_)
 - Skip final default values when unstructuring from a struct-like into a sequence. (PR_23_)
+- Added ``StructLikeOptions`` to tune behavior for struct-like types. (PR_23_)
 
 
 Added

@@ -21,6 +21,7 @@ from compages import (
     IntoTuple,
     IntoUnion,
     NamedTupleBase,
+    StructLikeOptions,
     Structurer,
     StructuringError,
 )
@@ -299,7 +300,11 @@ def test_structure_into_dataclass_from_mapping():
             int: IntoInt(),
             str: IntoStr(),
             DataclassBase: IntoDataclassFromMapping(
-                name_converter=lambda name, metadata: name + "_" if "foo" not in metadata else name
+                StructLikeOptions(
+                    to_unstructured_name=lambda name, metadata: name + "_"
+                    if "foo" not in metadata
+                    else name
+                )
             ),
         },
     )
@@ -379,7 +384,7 @@ def test_structure_into_named_tuple_from_mapping():
             int: IntoInt(),
             str: IntoStr(),
             NamedTupleBase: IntoNamedTupleFromMapping(
-                name_converter=lambda name, _metadata: name + "_"
+                StructLikeOptions(to_unstructured_name=lambda name, _metadata: name + "_")
             ),
         },
     )

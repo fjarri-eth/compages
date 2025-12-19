@@ -1,4 +1,5 @@
 from ._common import DataclassBase, NamedTupleBase
+from ._struct_like import StructLikeOptions
 from ._structure import (
     StructureHandler,
     Structurer,
@@ -75,6 +76,7 @@ __all__ = [
     "IntoTuple",
     "IntoUnion",
     "NamedTupleBase",
+    "StructLikeOptions",
     "StructureHandler",
     "Structurer",
     "StructurerContext",

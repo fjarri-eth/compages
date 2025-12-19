@@ -21,6 +21,7 @@ from compages import (
     AsUnion,
     DataclassBase,
     NamedTupleBase,
+    StructLikeOptions,
     UnstructureHandler,
     Unstructurer,
     UnstructurerContext,
@@ -198,7 +199,9 @@ def test_unstructure_as_dataclass_to_dict():
         {
             int: AsInt(),
             str: AsStr(),
-            DataclassBase: AsDataclassToDict(name_converter=lambda name, _metadata: name + "_"),
+            DataclassBase: AsDataclassToDict(
+                StructLikeOptions(to_unstructured_name=lambda name, _metadata: name + "_")
+            ),
         },
     )
 
@@ -340,7 +343,9 @@ def test_unstructure_as_named_tuple_to_dict():
         {
             int: AsInt(),
             str: AsStr(),
-            NamedTupleBase: AsNamedTupleToDict(name_converter=lambda name, _metadata: name + "_"),
+            NamedTupleBase: AsNamedTupleToDict(
+                StructLikeOptions(to_unstructured_name=lambda name, _metadata: name + "_")
+            ),
         },
     )
 

@@ -38,6 +38,10 @@ _T = TypeVar("_T")
 class StructurerContext(NamedTuple):
     structurer: "Structurer"
     structure_into: ExtendedType[Any]
+    user_context: Any
+
+    def nested_structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
+        return self.structurer.structure_into(structure_into, val, user_context=self.user_context)
 
 
 class StructureHandler:
@@ -61,8 +65,12 @@ class Structurer:
     ):
         self._handlers = dict(handlers)
 
-    def structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
-        context = StructurerContext(structurer=self, structure_into=structure_into)
+    def structure_into(
+        self, structure_into: ExtendedType[_T], val: Any, user_context: Any = None
+    ) -> _T:
+        context = StructurerContext(
+            structurer=self, structure_into=structure_into, user_context=user_context
+        )
         stack = GeneratorStack[StructurerContext, _T](context, val)
         lookup_order = get_lookup_order(structure_into)
 

@@ -40,6 +40,10 @@ _T = TypeVar("_T")
 class UnstructurerContext(NamedTuple):
     unstructurer: "Unstructurer"
     unstructure_as: ExtendedType[Any]
+    user_context: Any
+
+    def nested_unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+        return self.unstructurer.unstructure_as(unstructure_as, val, user_context=self.user_context)
 
 
 class UnstructureHandler:
@@ -69,7 +73,9 @@ class Unstructurer:
     ):
         self._handlers = dict(handlers)
 
-    def unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+    def unstructure_as(
+        self, unstructure_as: ExtendedType[_T], val: _T, user_context: Any = None
+    ) -> Any:
         lookup_order = get_lookup_order(unstructure_as)
 
         # We need this check to allow `Union` unstructuring to work
@@ -79,7 +85,9 @@ class Unstructurer:
             # but it always passes `isinstance_ext()`, so it won't appear in this branch.
             raise UnstructuringError(f"The value must be of type `{unstructure_as.__name__}`")
 
-        context = UnstructurerContext(unstructurer=self, unstructure_as=unstructure_as)
+        context = UnstructurerContext(
+            unstructurer=self, unstructure_as=unstructure_as, user_context=user_context
+        )
         stack = GeneratorStack[UnstructurerContext, Any](context, val)
 
         for tp in lookup_order:

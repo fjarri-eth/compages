@@ -21,6 +21,7 @@ Added
 
 - Support for default factory in dataclasses. (PR_21_)
 - Support for ``NamedTuple`` types. (PR_21_)
+- Support for user context passing. (PR_24_)
 
 
 Fixed
@@ -33,6 +34,7 @@ Fixed
 .. _PR_21: https://github.com/fjarri-eth/compages/pull/21
 .. _PR_22: https://github.com/fjarri-eth/compages/pull/22
 .. _PR_23: https://github.com/fjarri-eth/compages/pull/23
+.. _PR_24: https://github.com/fjarri-eth/compages/pull/24
 
 
 0.3.0 (2024-03-15)

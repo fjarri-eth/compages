@@ -1,6 +1,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
-from typing import Any, get_args
+from typing import Any, get_args, get_origin
 
 from ._common import ExtendedType
 from ._struct_like import (
@@ -111,13 +111,22 @@ class IntoUnion(StructureHandler):
 
 
 class IntoTuple(StructureHandler):
-    """Attempts to structure into a ``tuple`` given its type arguments."""
+    """
+    Attempts to structure into a ``tuple`` given its type arguments.
+
+    If the requested type is an unqalified ``tuple``, it is treated as ``tuple[Any, ...]``.
+    """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, list | tuple):
             raise StructuringError("Can only structure a tuple or a list into a tuple generic")
 
         elem_types = get_args(context.structure_into)
+
+        # Distinguish the cases of `tuple[()]` (explicitly a tuple with 0 arguments, acceptable)
+        # and `tuple` (unqualified tuple, error).
+        if len(elem_types) == 0 and get_origin(context.structure_into) is None:
+            elem_types = (Any, ...)
 
         # Homogeneous tuples (tuple[some_type, ...])
         if len(elem_types) == 2 and elem_types[1] == ...:
@@ -149,13 +158,21 @@ class IntoTuple(StructureHandler):
 
 
 class IntoList(StructureHandler):
-    """Attempts to structure into a ``list`` given its type arguments."""
+    """
+    Attempts to structure into a ``list`` given its type arguments.
+
+    If the requested type is an unqalified ``list``, it is treated as ``list[Any]``.
+    """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, list | tuple):
             raise StructuringError("Can only structure a tuple or a list into a list generic")
 
-        (item_type,) = get_args(context.structure_into)
+        args = get_args(context.structure_into)
+        if len(args) == 0:
+            args = (Any,)
+
+        (item_type,) = args
 
         result = []
         exceptions: list[tuple[PathElem, StructuringError]] = []
@@ -172,13 +189,21 @@ class IntoList(StructureHandler):
 
 
 class IntoDict(StructureHandler):
-    """Attempts to structure into a ``dict`` given its type arguments."""
+    """
+    Attempts to structure into a ``dict`` given its type arguments.
+
+    If the requested type is an unqalified ``dict``, it is treated as ``dict[Any, Any]``.
+    """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, dict):
             raise StructuringError("Can only structure a dict into a dict generic")
 
-        key_type, value_type = get_args(context.structure_into)
+        args = get_args(context.structure_into)
+        if len(args) == 0:
+            args = (Any, Any)
+
+        key_type, value_type = args
 
         result = {}
         exceptions: list[tuple[PathElem, StructuringError]] = []

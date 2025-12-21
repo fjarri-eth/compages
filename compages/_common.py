@@ -149,9 +149,13 @@ def isinstance_ext(val: Any, lookup_order: list[ExtendedType[Any]]) -> bool:
     regardless of what type the elements of `val` are
     (checking that is the responsibility of handlers).
 
+    All generics are currently assumed to be covariant.
+
     As a corollary or that, ``isinstance_ext(val, UnionType[...])`` is always ``True``.
     """
     for tp in lookup_order:
+        if tp is Any:
+            return True
         if tp is UnionType:
             return True
         # Mypy doesn't like it, but that's how Python works.

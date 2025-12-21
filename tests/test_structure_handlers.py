@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, field
 from types import UnionType
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pytest
 from compages import (
@@ -174,6 +174,12 @@ def test_structure_into_tuple():
     assert_exception_matches(exc.value, expected)
 
 
+def test_structure_into_unualified_tuple():
+    structurer = Structurer({tuple: IntoTuple(), Any: IntoInt()})
+    # Structuring into an unqualified tuple calls a handler for `Any` for its elements
+    assert structurer.structure_into(tuple, (1, 2)) == (1, 2)
+
+
 def test_structure_into_list():
     structurer = Structurer({list: IntoList(), int: IntoInt()})
 
@@ -192,6 +198,12 @@ def test_structure_into_list():
         [(ListElem(1), StructuringError("The value must be an integer"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_structure_into_unualified_list():
+    structurer = Structurer({list: IntoList(), Any: IntoInt()})
+    # Structuring into an unqualified list calls a handler for `Any` for its elements
+    assert structurer.structure_into(list, [1, 2]) == [1, 2]
 
 
 def test_structure_into_dict():
@@ -227,6 +239,12 @@ def test_structure_into_dict():
         [(DictValue(2), StructuringError("The value must be a string"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_structure_into_unualified_dict():
+    structurer = Structurer({dict: IntoDict(), Any: IntoInt()})
+    # Structuring into an unqualified dict calls a handler for `Any` for its elements
+    assert structurer.structure_into(dict, {1: 2}) == {1: 2}
 
 
 def test_structure_into_dataclass_from_sequence():

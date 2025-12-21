@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, field
 from types import UnionType
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import pytest
 from compages import (
@@ -140,6 +140,12 @@ def test_unstructure_as_tuple():
     assert_exception_matches(exc.value, expected)
 
 
+def test_unstructure_as_unqualified_tuple():
+    unstructurer = Unstructurer({tuple: AsTuple(), Any: AsInt()})
+    # Unstructuring a an unqualified tuple calls a handler for `Any` for its elements
+    assert unstructurer.unstructure_as(tuple, (1, 2)) == [1, 2]
+
+
 def test_unstructure_as_list():
     unstructurer = Unstructurer({list: AsList(), int: AsInt()})
 
@@ -157,6 +163,12 @@ def test_unstructure_as_list():
         [(ListElem(1), UnstructuringError("The value must be of type `int`"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_unstructure_as_unqualified_list():
+    unstructurer = Unstructurer({list: AsList(), Any: AsInt()})
+    # Unstructuring a an unqualified list calls a handler for `Any` for its elements
+    assert unstructurer.unstructure_as(list, [1, 2]) == [1, 2]
 
 
 def test_unstructure_as_dict():
@@ -192,6 +204,12 @@ def test_unstructure_as_dict():
         [(DictValue(2), UnstructuringError("The value must be of type `str`"))],
     )
     assert_exception_matches(exc.value, expected)
+
+
+def test_unstructure_as_unqualified_dict():
+    unstructurer = Unstructurer({dict: AsDict(), Any: AsInt()})
+    # Unstructuring a an unqualified dict calls a handler for `Any` for its elements
+    assert unstructurer.unstructure_as(dict, {1: 2}) == {1: 2}
 
 
 def test_unstructure_as_dataclass_to_dict():

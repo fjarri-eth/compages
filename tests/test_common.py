@@ -1,7 +1,7 @@
 from collections import namedtuple
 from dataclasses import dataclass
 from types import UnionType
-from typing import NamedTuple, NewType, Union
+from typing import Any, NamedTuple, NewType, Union
 
 import pytest
 from compages._common import (
@@ -74,6 +74,10 @@ def test_isinstance_ext():
     assert not isinstance_ext(A(), get_lookup_order(B))
     assert isinstance_ext(1, get_lookup_order(D))
     assert isinstance_ext([1], get_lookup_order(list[int]))
+
+    # Anything is an instance of `Any`
+    assert isinstance_ext(1, [Any])
+    assert isinstance_ext(None, [Any])
 
     # Note: `isinstance_ext()` cannot introspect the value
     assert isinstance_ext(["a"], get_lookup_order(list[int]))

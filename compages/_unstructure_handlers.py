@@ -1,5 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, get_args
+from typing import Any, get_args, get_origin
 
 from ._common import ExtendedType
 from ._struct_like import (
@@ -86,13 +86,22 @@ class AsUnion(UnstructureHandler):
 
 
 class AsTuple(UnstructureHandler):
-    """Unstructures as a ``tuple`` given its type arguments."""
+    """
+    Unstructures as a ``tuple`` given its type arguments.
+
+    If the requested type is an unqalified ``tuple``, it is treated as ``tuple[Any, ...]``.
+    """
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         if not isinstance(val, Sequence):
             raise UnstructuringError("Can only unstructure a Sequence as a tuple")
 
         elem_types = get_args(context.unstructure_as)
+
+        # Distinguish the cases of `tuple[()]` (explicitly a tuple with 0 arguments, acceptable)
+        # and `tuple` (unqualified tuple, error).
+        if len(elem_types) == 0 and get_origin(context.unstructure_as) is None:
+            elem_types = (Any, ...)
 
         # Homogeneous tuples (tuple[some_type, ...])
         if len(elem_types) == 2 and elem_types[1] == ...:
@@ -124,13 +133,21 @@ class AsTuple(UnstructureHandler):
 
 
 class AsDict(UnstructureHandler):
-    """Unstructures as a ``dict`` given its type arguments."""
+    """
+    Unstructures as a ``dict`` given its type arguments.
+
+    If the requested type is an unqalified ``dict``, it is treated as ``dict[Any, Any]``.
+    """
 
     def unstructure(self, context: UnstructurerContext, val: Any) -> Any:
         if not isinstance(val, Mapping):
             raise UnstructuringError("Can only unstructure a Mapping as a dict")
 
-        key_type, value_type = get_args(context.unstructure_as)
+        args = get_args(context.unstructure_as)
+        if len(args) == 0:
+            args = (Any, Any)
+
+        key_type, value_type = args
 
         result = {}
         exceptions: list[tuple[PathElem, UnstructuringError]] = []
@@ -158,13 +175,21 @@ class AsDict(UnstructureHandler):
 
 
 class AsList(UnstructureHandler):
-    """Unstructures as a ``list`` given its type arguments."""
+    """
+    Unstructures as a ``list`` given its type arguments.
+
+    If the requested type is an unqalified ``list``, it is treated as ``list[Any]``.
+    """
 
     def unstructure(self, context: UnstructurerContext, val: list[Any]) -> Any:
         if not isinstance(val, Sequence):
             raise UnstructuringError("Can only unstructure a Sequence as a list")
 
-        (item_type,) = get_args(context.unstructure_as)
+        args = get_args(context.unstructure_as)
+        if len(args) == 0:
+            args = (Any,)
+
+        (item_type,) = args
 
         result = []
         exceptions: list[tuple[PathElem, UnstructuringError]] = []

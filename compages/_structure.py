@@ -1,11 +1,18 @@
 from collections.abc import Mapping
-from typing import Any, NamedTuple, TypeVar
+from dataclasses import dataclass
+from typing import Any, TypeVar
 
 from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
 from .path import PathElem
 
 
 class StructuringError(Exception):
+    """
+    An error during structuring.
+
+    Accumulates possible nested errors.
+    """
+
     def __init__(self, message: str, inner_errors: list[tuple[PathElem, "StructuringError"]] = []):
         super().__init__(message)
         self.message = message
@@ -35,39 +42,73 @@ def collect_messages(
 _T = TypeVar("_T")
 
 
-class StructurerContext(NamedTuple):
+@dataclass
+class StructurerContext:
+    """A context object passed to handlers during structuring."""
+
     structurer: "Structurer"
+    """The current structurer."""
+
     structure_into: ExtendedType[Any]
+    """
+    The requested return value type.
+
+    Can be a regular type, a newtype, or a generic type.
+    """
+
     user_context: Any
+    """
+    The custom object the user passed to :py:meth:`Unstructurer.unstructure_as`.
+    """
 
     def nested_structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
+        """
+        Calls :py:meth:`Structurer.structure_into` of ``self.structurer``
+        passing on the user context.
+        """
         return self.structurer.structure_into(structure_into, val, user_context=self.user_context)
 
 
 class StructureHandler:
+    """A base class for structuring logic attached to a type."""
+
     def structure(
         self,
         context: StructurerContext,  # noqa: ARG002
         value: Any,
     ) -> Any:
+        """
+        Structures the given ``value`` returning an instance of ``context.structure_into``.
+
+        If not defined, falls back to :py:meth:`simple_structure`.
+        """
         return self.simple_structure(value)
 
     def simple_structure(self, value: Any) -> Any:
+        """
+        Structures the given ``value``.
+
+        Use for the cases where the information from ``context`` is not needed.
+        If :py:meth:`structure` is not defined, this method must be defined.
+        """
         raise NotImplementedError(
             "`StructureHandler` must implement either `structure()` or `simple_structure()`"
         )
 
 
 class Structurer:
-    def __init__(
-        self,
-        handlers: Mapping[Any, StructureHandler] = {},
-    ):
+    def __init__(self, handlers: Mapping[Any, StructureHandler] = {}):
         self._handlers = dict(handlers)
 
     def structure_into(
         self, structure_into: ExtendedType[_T], val: Any, user_context: Any = None
     ) -> _T:
+        """
+        Structures (deserializes) the given ``value`` into the type ``structure_into``
+        with an optional ``user_context`` (which will be passed to the handlers).
+
+        Raises :py:class:`StructuringError` for any structuring-related error.
+        """
         context = StructurerContext(
             structurer=self, structure_into=structure_into, user_context=user_context
         )

@@ -16,12 +16,22 @@ from .path import DictKey, DictValue, ListElem, PathElem, StructField, UnionVari
 
 
 class IntoNone(StructureHandler):
+    """
+    If ``val`` is ``None``, structures into itself,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> None:
         if val is not None:
             raise StructuringError("The value must be `None`")
 
 
 class IntoInt(StructureHandler):
+    """
+    If ``val`` is an ``int`` (but not ``bool``), structures into itself,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> int:
         # Handling a special case of `bool` here since in Python `bool` is an `int`,
         # and we don't want to mix them up.
@@ -31,6 +41,11 @@ class IntoInt(StructureHandler):
 
 
 class IntoFloat(StructureHandler):
+    """
+    If ``val`` is a ``float`` or ``int``, converts into ``float``,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> float:
         # Allow integers as well, even though `int` is not a subclass of `float` in Python.
         if not isinstance(val, int | float):
@@ -39,6 +54,11 @@ class IntoFloat(StructureHandler):
 
 
 class IntoBool(StructureHandler):
+    """
+    If ``val`` is a ``bool``, structures into itself,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> bool:
         if not isinstance(val, bool):
             raise StructuringError("The value must be a boolean")
@@ -46,6 +66,11 @@ class IntoBool(StructureHandler):
 
 
 class IntoBytes(StructureHandler):
+    """
+    If ``val`` is a ``bytes``, structures into itself,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> bytes:
         if not isinstance(val, bytes):
             raise StructuringError("The value must be a bytestring")
@@ -53,6 +78,11 @@ class IntoBytes(StructureHandler):
 
 
 class IntoStr(StructureHandler):
+    """
+    If ``val`` is a ``str``, structures into itself,
+    otherwise raises a :py:class:`StructuringError`.
+    """
+
     def simple_structure(self, val: Any) -> str:
         if not isinstance(val, str):
             raise StructuringError("The value must be a string")
@@ -60,6 +90,13 @@ class IntoStr(StructureHandler):
 
 
 class IntoUnion(StructureHandler):
+    """
+    Attempts to structure into every type in the union in order,
+    returns the result of the first succeeded call.
+
+    If none succeeded, raises a :py:class:`StructuringError`.
+    """
+
     def structure(self, context: StructurerContext, val: Any) -> Any:
         variants = get_args(context.structure_into)
 
@@ -74,6 +111,8 @@ class IntoUnion(StructureHandler):
 
 
 class IntoTuple(StructureHandler):
+    """Attempts to structure into a ``tuple`` given its type arguments."""
+
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, list | tuple):
             raise StructuringError("Can only structure a tuple or a list into a tuple generic")
@@ -110,6 +149,8 @@ class IntoTuple(StructureHandler):
 
 
 class IntoList(StructureHandler):
+    """Attempts to structure into a ``list`` given its type arguments."""
+
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, list | tuple):
             raise StructuringError("Can only structure a tuple or a list into a list generic")
@@ -131,6 +172,8 @@ class IntoList(StructureHandler):
 
 
 class IntoDict(StructureHandler):
+    """Attempts to structure into a ``dict`` given its type arguments."""
+
     def structure(self, context: StructurerContext, val: Any) -> Any:
         if not isinstance(val, dict):
             raise StructuringError("Can only structure a dict into a dict generic")
@@ -265,6 +308,11 @@ class _MappingIntoStructLike(StructureHandler):
 
 
 class IntoDataclassFromSequence(StructureHandler):
+    """
+    Attempts to structure into a :py:func:`~dataclasses.dataclass` instance
+    from a :py:class:`~collections.abc.Sequence` type.
+    """
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _SequenceIntoStructLike(get_fields_dataclass, options)
 
@@ -273,6 +321,11 @@ class IntoDataclassFromSequence(StructureHandler):
 
 
 class IntoDataclassFromMapping(StructureHandler):
+    """
+    Attempts to structure into a :py:func:`~dataclasses.dataclass` instance
+    from a :py:class:`~collections.abc.Mapping` type.
+    """
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _MappingIntoStructLike(get_fields_dataclass, options)
 
@@ -281,6 +334,11 @@ class IntoDataclassFromMapping(StructureHandler):
 
 
 class IntoNamedTupleFromSequence(StructureHandler):
+    """
+    Attempts to structure into a :py:class:`~typing.NamedTuple` instance
+    from a :py:class:`~collections.abc.Sequence` type.
+    """
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _SequenceIntoStructLike(get_fields_named_tuple, options)
 
@@ -289,6 +347,11 @@ class IntoNamedTupleFromSequence(StructureHandler):
 
 
 class IntoNamedTupleFromMapping(StructureHandler):
+    """
+    Attempts to structure into a :py:class:`~typing.NamedTuple` instance
+    from a :py:class:`~collections.abc.Mapping` type.
+    """
+
     def __init__(self, options: StructLikeOptions = StructLikeOptions()):
         self._handler = _MappingIntoStructLike(get_fields_named_tuple, options)
 

@@ -166,7 +166,11 @@ That is why :py:func:`~compages.get_lookup_order` adds marker types :py:class:`~
        x: int
        y: str
 
-   unstructurer = Unstructurer({int: AsInt(), str: AsStr(), DataclassBase: AsDataclassToDict()})
+   unstructurer = Unstructurer({
+      int: AsInt(),
+      str: AsStr(),
+      DataclassBase: AsDataclassToDict()
+   })
    print(unstructurer.unstructure_as(Foo, Foo(x=1, y="bar")))
 
 .. testoutput::
@@ -192,7 +196,12 @@ For this section we are using ``Structure`` since it is more illustrative.
    class Foo:
        x: int | str
 
-   structurer = Structurer({int: IntoInt(), str: IntoStr(), DataclassBase: IntoDataclassFromMapping(), UnionType: IntoUnion()})
+   structurer = Structurer({
+      int: IntoInt(),
+      str: IntoStr(),
+      DataclassBase: IntoDataclassFromMapping(),
+      UnionType: IntoUnion()
+   })
    print(structurer.structure_into(Foo, {"x": 1}))
    print(structurer.structure_into(Foo, {"x": "a"}))
 
@@ -246,7 +255,13 @@ This can happen multiple times, but should finish with a handler that does not c
            tx_dict["type"] = self.type
            return tx_dict
 
-   unstructurer = Unstructurer({int: AsInt(), str: AsStr(), DataclassBase: AsDataclassToDict(), Type1Tx: AsTx(1), Type2Tx: AsTx(2)})
+   unstructurer = Unstructurer({
+      int: AsInt(),
+      str: AsStr(),
+      DataclassBase: AsDataclassToDict(),
+      Type1Tx: AsTx(1),
+      Type2Tx: AsTx(2)
+   })
    print(unstructurer.unstructure_as(Type1Tx, Type1Tx(x=1, y="a")))
    print(unstructurer.unstructure_as(Type2Tx, Type2Tx(z=3, w="b")))
 
@@ -280,7 +295,13 @@ As a result, ``str()`` of the final error will contain all the nested errors tha
    class Bar:
        f: Foo
 
-   structurer = Structurer({int: IntoInt(), str: IntoStr(), list: IntoList(), DataclassBase: IntoDataclassFromMapping(), UnionType: IntoUnion()})
+   structurer = Structurer({
+      int: IntoInt(),
+      str: IntoStr(),
+      list: IntoList(),
+      DataclassBase: IntoDataclassFromMapping(),
+      UnionType: IntoUnion()
+   })
    try:
        structurer.structure_into(Bar, {"f": {"x": None, "y": ["a"]}})
    except StructuringError as exc:

@@ -104,7 +104,7 @@ class IntoUnion(StructureHandler):
         for variant in variants:
             try:
                 return context.nested_structure_into(variant, val)
-            except StructuringError as exc:  # noqa: PERF203
+            except StructuringError as exc:
                 exceptions.append((UnionVariant(variant), exc))
 
         raise StructuringError(f"Cannot structure into {context.structure_into}", exceptions)
@@ -139,7 +139,7 @@ class IntoTuple(StructureHandler):
         for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
             try:
                 result.append(context.nested_structure_into(tp, item))
-            except StructuringError as exc:  # noqa: PERF203
+            except StructuringError as exc:
                 exceptions.append((ListElem(index), exc))
 
         if exceptions:
@@ -162,7 +162,7 @@ class IntoList(StructureHandler):
         for index, item in enumerate(val):
             try:
                 result.append(context.nested_structure_into(item_type, item))
-            except StructuringError as exc:  # noqa: PERF203
+            except StructuringError as exc:
                 exceptions.append((ListElem(index), exc))
 
         if exceptions:
@@ -235,7 +235,7 @@ class _SequenceIntoStructLike(StructureHandler):
         for i, field in enumerate(struct_fields[: len(val)]):
             try:
                 results[field.name] = context.nested_structure_into(field.type, val[i])
-            except StructuringError as exc:  # noqa: PERF203
+            except StructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
         for field in struct_fields[len(val) :]:

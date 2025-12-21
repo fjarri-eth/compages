@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any
 
 from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order, isinstance_ext
 from .path import PathElem
@@ -41,9 +41,6 @@ def collect_messages(
     return result
 
 
-_T = TypeVar("_T")
-
-
 @dataclass
 class UnstructurerContext:
     """A context object passed to handlers during unstructuring."""
@@ -63,7 +60,7 @@ class UnstructurerContext:
     The custom object the user passed to :py:meth:`Unstructurer.unstructure_as`.
     """
 
-    def nested_unstructure_as(self, unstructure_as: ExtendedType[_T], val: _T) -> Any:
+    def nested_unstructure_as[T](self, unstructure_as: ExtendedType[T], val: T) -> Any:
         """
         Calls :py:meth:`Unstructurer.unstructure_as` of ``self.unstructurer``
         passing on the user context.
@@ -104,8 +101,8 @@ class Unstructurer:
     def __init__(self, handlers: Mapping[Any, UnstructureHandler] = {}):
         self._handlers = dict(handlers)
 
-    def unstructure_as(
-        self, unstructure_as: ExtendedType[_T], val: _T, user_context: Any = None
+    def unstructure_as[T](
+        self, unstructure_as: ExtendedType[T], val: T, user_context: Any = None
     ) -> Any:
         """
         Unstructures (serializes) the given ``value`` as the type ``unstructure_as``

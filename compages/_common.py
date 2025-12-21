@@ -2,29 +2,14 @@ from collections.abc import Callable, Generator
 from dataclasses import is_dataclass
 from enum import Enum
 from types import GeneratorType, UnionType
-from typing import (
-    Any,
-    Generic,
-    Literal,
-    Protocol,
-    TypeAlias,
-    TypeVar,
-    Union,
-    cast,
-    get_origin,
-    runtime_checkable,
-)
-
-_ResultType = TypeVar("_ResultType")
-
-_ContextType = TypeVar("_ContextType")
+from typing import Any, Literal, Protocol, Union, cast, get_origin, runtime_checkable
 
 
 class Result(Enum):
     UNDEFINED = "result undefined"
 
 
-class GeneratorStack(Generic[_ContextType, _ResultType]):
+class GeneratorStack[ContextType, ResultType]:
     """
     Maintains a stack of suspended continuations that take fixed arguments (``args``)
     and a value, yield a value to use to create the next continuation,
@@ -33,14 +18,14 @@ class GeneratorStack(Generic[_ContextType, _ResultType]):
     The stack is unrolled as soon as a function returning a result and not a continuation is pushed.
     """
 
-    def __init__(self, context: _ContextType, value: Any):
+    def __init__(self, context: ContextType, value: Any):
         self._context = context
-        self._generators: list[Generator[_ResultType, Any, Any]] = []
+        self._generators: list[Generator[ResultType, Any, Any]] = []
         self._value = value
 
     def push(
-        self, func: None | Callable[[_ContextType, Any], _ResultType]
-    ) -> _ResultType | Literal[Result.UNDEFINED]:
+        self, func: None | Callable[[ContextType, Any], ResultType]
+    ) -> ResultType | Literal[Result.UNDEFINED]:
         """
         Takes a function that takes two arguments (``context`` passed to the constructor
         and the current ``value``), and either returns a result or a continuation.
@@ -82,31 +67,25 @@ class GeneratorStack(Generic[_ContextType, _ResultType]):
         return not self._generators
 
 
-_T_co = TypeVar("_T_co", covariant=True)
-
-
 @runtime_checkable
-class TypedNewType(Protocol, Generic[_T_co]):
+class TypedNewType[T_co](Protocol):
     """
     Unfortunately, :py:class:`typing.NewType` in Python is not generic,
     so we cannot express the concept of "the type of instances of of this type,
     given the type's type annotation".
 
     This protocol covers any instance of :py:class:`typing.NewType`
-    and has the same properties as ``type[_T]``.
+    and has the same properties as ``type[T]``.
     """
 
-    def __call__(self, value: Any) -> _T_co: ...
+    def __call__(self, value: Any) -> T_co: ...
 
     __supertype__: "type[Any] | TypedNewType[Any]"
 
     __name__: str
 
 
-_T = TypeVar("_T")
-
-
-ExtendedType: TypeAlias = type[_T] | TypedNewType[_T]
+type ExtendedType[T] = type[T] | TypedNewType[T]
 
 
 class DataclassBase:

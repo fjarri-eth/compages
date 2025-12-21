@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any
 
 from ._common import ExtendedType, GeneratorStack, Result, get_lookup_order
 from .path import PathElem
@@ -39,9 +39,6 @@ def collect_messages(
     return result
 
 
-_T = TypeVar("_T")
-
-
 @dataclass
 class StructurerContext:
     """A context object passed to handlers during structuring."""
@@ -61,7 +58,7 @@ class StructurerContext:
     The custom object the user passed to :py:meth:`Unstructurer.unstructure_as`.
     """
 
-    def nested_structure_into(self, structure_into: ExtendedType[_T], val: Any) -> _T:
+    def nested_structure_into[T](self, structure_into: ExtendedType[T], val: Any) -> T:
         """
         Calls :py:meth:`Structurer.structure_into` of ``self.structurer``
         passing on the user context.
@@ -100,9 +97,9 @@ class Structurer:
     def __init__(self, handlers: Mapping[Any, StructureHandler] = {}):
         self._handlers = dict(handlers)
 
-    def structure_into(
-        self, structure_into: ExtendedType[_T], val: Any, user_context: Any = None
-    ) -> _T:
+    def structure_into[T](
+        self, structure_into: ExtendedType[T], val: Any, user_context: Any = None
+    ) -> T:
         """
         Structures (deserializes) the given ``value`` into the type ``structure_into``
         with an optional ``user_context`` (which will be passed to the handlers).
@@ -112,7 +109,7 @@ class Structurer:
         context = StructurerContext(
             structurer=self, structure_into=structure_into, user_context=user_context
         )
-        stack = GeneratorStack[StructurerContext, _T](context, val)
+        stack = GeneratorStack[StructurerContext, T](context, val)
         lookup_order = get_lookup_order(structure_into)
 
         for tp in lookup_order:

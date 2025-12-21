@@ -79,7 +79,7 @@ class AsUnion(UnstructureHandler):
         for variant in variants:
             try:
                 return context.nested_unstructure_as(variant, val)
-            except UnstructuringError as exc:  # noqa: PERF203
+            except UnstructuringError as exc:
                 exceptions.append((UnionVariant(variant), exc))
 
         raise UnstructuringError(f"Cannot unstructure as {context.unstructure_as}", exceptions)
@@ -114,7 +114,7 @@ class AsTuple(UnstructureHandler):
         for index, (item, tp) in enumerate(zip(val, elem_types, strict=True)):
             try:
                 result.append(context.nested_unstructure_as(tp, item))
-            except UnstructuringError as exc:  # noqa: PERF203
+            except UnstructuringError as exc:
                 exceptions.append((ListElem(index), exc))
 
         if exceptions:
@@ -171,7 +171,7 @@ class AsList(UnstructureHandler):
         for index, item in enumerate(val):
             try:
                 result.append(context.nested_unstructure_as(item_type, item))
-            except UnstructuringError as exc:  # noqa: PERF203
+            except UnstructuringError as exc:
                 exceptions.append((ListElem(index), exc))
 
         if exceptions:
@@ -253,7 +253,7 @@ class _AsStructLikeToList(UnstructureHandler):
         for field in struct_fields:
             try:
                 result.append(context.nested_unstructure_as(field.type, getattr(val, field.name)))
-            except UnstructuringError as exc:  # noqa: PERF203
+            except UnstructuringError as exc:
                 exceptions.append((StructField(field.name), exc))
 
         if self._options.unstructure_skip_defaults:

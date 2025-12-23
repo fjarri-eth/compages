@@ -152,7 +152,7 @@ def test_structure_into_tuple():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(tuple[int, str], {"x": 1, "y": "a"})
-    expected = StructuringError("Can only structure a tuple or a list into a tuple generic")
+    expected = StructuringError("Can only structure a `Sequence` into a tuple generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -188,7 +188,7 @@ def test_structure_into_list():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(list[int], {"x": 1, "y": "a"})
-    expected = StructuringError("Can only structure a tuple or a list into a list generic")
+    expected = StructuringError("Can only structure a `Sequence` into a list generic")
     assert_exception_matches(exc.value, expected)
 
     with pytest.raises(StructuringError) as exc:
@@ -219,7 +219,9 @@ def test_structure_into_dict():
 
     with pytest.raises(StructuringError) as exc:
         structurer.structure_into(dict[int, str], [(1, "a"), (2, "b")])
-    expected = StructuringError("Can only structure a dict into a dict generic")
+    expected = StructuringError(
+        "Can only structure a `Mapping` or `MappingProxyType` into a dict generic"
+    )
     assert_exception_matches(exc.value, expected)
 
     # Error structuring a key

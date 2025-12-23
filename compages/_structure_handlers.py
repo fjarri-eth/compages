@@ -118,8 +118,8 @@ class IntoTuple(StructureHandler):
     """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
-        if not isinstance(val, list | tuple):
-            raise StructuringError("Can only structure a tuple or a list into a tuple generic")
+        if not isinstance(val, Sequence):
+            raise StructuringError("Can only structure a `Sequence` into a tuple generic")
 
         elem_types = get_args(context.structure_into)
 
@@ -165,8 +165,8 @@ class IntoList(StructureHandler):
     """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
-        if not isinstance(val, list | tuple):
-            raise StructuringError("Can only structure a tuple or a list into a list generic")
+        if not isinstance(val, Sequence):
+            raise StructuringError("Can only structure a `Sequence` into a list generic")
 
         args = get_args(context.structure_into)
         if len(args) == 0:
@@ -196,8 +196,10 @@ class IntoDict(StructureHandler):
     """
 
     def structure(self, context: StructurerContext, val: Any) -> Any:
-        if not isinstance(val, dict):
-            raise StructuringError("Can only structure a dict into a dict generic")
+        if not isinstance(val, Mapping | MappingProxyType):
+            raise StructuringError(
+                "Can only structure a `Mapping` or `MappingProxyType` into a dict generic"
+            )
 
         args = get_args(context.structure_into)
         if len(args) == 0:
